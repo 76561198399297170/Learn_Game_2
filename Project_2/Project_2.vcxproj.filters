@@ -13,6 +13,12 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="头文件\Scene">
+      <UniqueIdentifier>{8ab88159-6f4b-4bfb-a49c-7b4e66ab558f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="头文件\Manager">
+      <UniqueIdentifier>{a54e597d-40e9-4cfb-850e-4a3ffb15d7f1}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -21,13 +27,16 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="scene.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="menuScene.h">
-      <Filter>头文件</Filter>
+      <Filter>头文件\Scene</Filter>
     </ClInclude>
     <ClInclude Include="gameScene.h">
-      <Filter>头文件</Filter>
+      <Filter>头文件\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="menuScene.h">
+      <Filter>头文件\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="sceneManager.h">
+      <Filter>头文件\Manager</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
