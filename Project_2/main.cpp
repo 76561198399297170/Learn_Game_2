@@ -1,18 +1,29 @@
 #include "scene.h"
 #include "menuScene.h"
+#include "gameScene.h"
+#include "selectorScene.h"
+#include "sceneManager.h"
 
 #include <graphics.h>
 
 const int FPS = 60;
+
+Scene* menu_scene = nullptr;
+Scene* game_scene = nullptr;
+Scene* selector_scene = nullptr;
+
+SceneManager scene_manager;
 
 int main()
 {
 	ExMessage msg;
 
 	initgraph(1200, 720);
-
-	Scene* scene = new MenuScene();
-	scene->on_enter();
+	
+	menu_scene = new MenuScene();
+	game_scene = new GameScene();
+	selector_scene = new SelectorScene();
+	scene_manager.setCurrentState(menu_scene);
 
 	BeginBatchDraw();
 	while (true)
@@ -21,12 +32,12 @@ int main()
 
 		while (peekmessage(&msg))
 		{
-			scene->on_input(msg);
+			scene_manager.on_input(msg);
 		}
-		scene->on_update();
+		scene_manager.on_updata();
 
 		cleardevice();
-		scene->on_draw();
+		scene_manager.on_draw();
 
 		FlushBatchDraw();
 

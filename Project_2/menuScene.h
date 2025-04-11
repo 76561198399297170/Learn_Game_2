@@ -2,8 +2,11 @@
 #define _MENU_SCENE_H_
 
 #include "scene.h"
+#include "sceneManager.h"
 
 #include <iostream>
+
+extern SceneManager scene_manager;
 
 class MenuScene : public Scene
 {
@@ -26,7 +29,13 @@ public:
 		outtextxy(10, 10, L"Ö÷²Ëµ¥»æÖÆ");
 	}
 
-	virtual void on_input(const ExMessage& msg) {}
+	virtual void on_input(const ExMessage& msg)
+	{
+		if (msg.message == WM_KEYDOWN)
+		{
+			scene_manager.switchTo(SceneManager::SceneType::Selector);
+		}
+	}
 
 	virtual void on_exit()
 	{
