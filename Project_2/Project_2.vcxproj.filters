@@ -14,10 +14,10 @@
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
     <Filter Include="头文件\Scene">
-      <UniqueIdentifier>{8ab88159-6f4b-4bfb-a49c-7b4e66ab558f}</UniqueIdentifier>
+      <UniqueIdentifier>{0d41b5c7-28df-4763-8249-a39aa96b75dc}</UniqueIdentifier>
     </Filter>
     <Filter Include="头文件\Manager">
-      <UniqueIdentifier>{a54e597d-40e9-4cfb-850e-4a3ffb15d7f1}</UniqueIdentifier>
+      <UniqueIdentifier>{b8e865e8-d090-4389-90fb-4980c8789e89}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -26,20 +26,20 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="scene.h">
-      <Filter>头文件\Scene</Filter>
-    </ClInclude>
     <ClInclude Include="gameScene.h">
       <Filter>头文件\Scene</Filter>
     </ClInclude>
     <ClInclude Include="menuScene.h">
       <Filter>头文件\Scene</Filter>
     </ClInclude>
-    <ClInclude Include="sceneManager.h">
-      <Filter>头文件\Manager</Filter>
+    <ClInclude Include="scene.h">
+      <Filter>头文件\Scene</Filter>
     </ClInclude>
     <ClInclude Include="selectorScene.h">
       <Filter>头文件\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="sceneManager.h">
+      <Filter>头文件\Manager</Filter>
     </ClInclude>
     <ClInclude Include="atlas.h">
       <Filter>头文件</Filter>

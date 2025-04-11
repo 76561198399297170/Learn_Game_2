@@ -4,7 +4,7 @@
 #include <vector>
 #include <graphics.h>
 
-class Atlas 
+class Atlas
 {
 public:
 	Atlas() = default;

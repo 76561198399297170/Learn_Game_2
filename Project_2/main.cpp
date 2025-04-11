@@ -19,7 +19,7 @@ int main()
 	ExMessage msg;
 
 	initgraph(1200, 720);
-	
+
 	menu_scene = new MenuScene();
 	game_scene = new GameScene();
 	selector_scene = new SelectorScene();

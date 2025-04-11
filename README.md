@@ -1005,7 +1005,7 @@ public:
 	{
 		if (msg.message == WM_KEYDOWN)
 		{
-			scene_manager.switchTo(SceneManager::SceneType::Menu);
+			scene_manager.switchTo(SceneManager::SceneType::Game);
 		}
 	}
 
@@ -1099,4 +1099,3 @@ public:
 
 
 ## 第三节
-
