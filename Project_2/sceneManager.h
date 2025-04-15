@@ -47,9 +47,9 @@ public:
 		this->m_current_scene->on_enter();
 	}
 
-	void on_updata()
+	void on_updata(int delta)
 	{
-		this->m_current_scene->on_update();
+		this->m_current_scene->on_update(delta);
 	}
 
 	void on_draw()

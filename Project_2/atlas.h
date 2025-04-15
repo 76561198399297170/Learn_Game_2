@@ -1,8 +1,8 @@
 #ifndef _ATLAS_H_
-#define _ATALS_H_
+#define _ATLAS_H_
 
-#include <vector>
 #include <graphics.h>
+#include <vector>
 
 class Atlas
 {

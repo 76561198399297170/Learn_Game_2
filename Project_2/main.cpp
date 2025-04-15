@@ -1,9 +1,8 @@
-#include "scene.h"
+#include "atlas.h"
+#include "sceneManager.h"
 #include "menuScene.h"
 #include "gameScene.h"
 #include "selectorScene.h"
-#include "sceneManager.h"
-#include "atlas.h"
 #include "utils.h"
 
 #pragma comment(lib, "Winmm.lib")
@@ -200,6 +199,7 @@ int main()
 	selector_scene = new SelectorScene();
 	scene_manager.setCurrentState(menu_scene);
 
+
 	BeginBatchDraw();
 	while (true)
 	{
@@ -209,7 +209,12 @@ int main()
 		{
 			scene_manager.on_input(msg);
 		}
-		scene_manager.on_updata();
+
+		static DWORD last_tick_time = GetTickCount();
+		DWORD current_tick_time = GetTickCount();
+		DWORD delta_tick_time = current_tick_time - last_tick_time;
+		scene_manager.on_updata(delta_tick_time);
+		last_tick_time = current_tick_time;
 
 		cleardevice();
 		scene_manager.on_draw();

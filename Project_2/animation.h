@@ -1,10 +1,11 @@
 #ifndef _ANIMATION_H_
 #define _ANIMATION_H_
 
-#include <functional>
-
 #include "atlas.h"
 #include "utils.h"
+
+
+#include <functional>
 
 class Animation
 {

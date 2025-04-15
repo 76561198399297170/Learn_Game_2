@@ -1,7 +1,6 @@
 #ifndef _GAME_SCENE_H_
 #define _GAME_SCENE_H_
 
-#include "scene.h"
 #include "sceneManager.h"
 
 #include <iostream>
@@ -19,7 +18,7 @@ public:
 		std::cout << "进入游戏局内场景！" << std::endl;
 	}
 
-	virtual void on_update()
+	virtual void on_update(int delta)
 	{
 		std::cout << "游戏运行中..." << std::endl;
 	}

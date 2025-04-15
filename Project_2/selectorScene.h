@@ -1,7 +1,6 @@
 #ifndef _SELECTOR_SCENE_H_
 #define _SELECTOR_SCENE_H_
 
-#include "scene.h"
 #include "sceneManager.h"
 
 #include <iostream>
@@ -19,7 +18,7 @@ public:
 		std::cout << "进入选人！" << std::endl;
 	}
 
-	virtual void on_update()
+	virtual void on_update(int delta)
 	{
 		std::cout << "选人运行中..." << std::endl;
 	}

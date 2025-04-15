@@ -675,7 +675,7 @@ scene_manager.switchTo(SceneManager::SceneType::Menu);
 
 ```
 #ifndef _ATLAS_H_
-#define _ATALS_H_
+#define _ATLAS_H_
 
 #include <vector>
 #include <graphics.h>
@@ -805,7 +805,7 @@ int main()
 
 ```
 #ifndef _ATLAS_H_
-#define _ATALS_H_
+#define _ATLAS_H_
 
 #include <vector>
 #include <graphics.h>
@@ -1848,4 +1848,91 @@ private:
 
 ## 第四节
 
-游戏设计领域有一个很著名的概念叫"3C"，其几乎囊括了大部分游戏设计中最基本的三种元素
+游戏设计领域有一个很著名的概念叫"3C"，其几乎囊括了大部分游戏设计中最基本的三种元素角色Character，摄像机Camera，控制Control，决定视野与观察世界的核心元素就是Camera摄像机，为了让画面更灵活自然增强世界感，由此我们第四节进行讨论如何实现2D摄像机的基础。
+
+虽然在之前项目中以及可以使用动画框架顺利进行渲染了，但摄像机作为整个框架中极为重要的一环，还是需要将这个部分集成到地产代码中去再开始更上层的主体逻辑开发。
+
+### 3C——Camera摄像头概念
+
+以超级马里奥为例，摄像头始终跟随马里奥，当马里奥向右移动实际相对的其他元素则是向左移动，也就是当整个背景向左移动，玩家也就向右移动了，也就是以玩家为参考系，移动玩家也就是移动除玩家外的所有对象，但是移动全体对象的话，碰撞检测与坐标相关问题该如何解决呢？
+
+此时应引入两个重要概念进行比对，“窗口坐标系”与“世界坐标系”，窗口坐标系的概念我们一致都在使用还是比较熟悉了，在EasyX默认窗口坐标系就是左上角作为原点水平向右与竖直向下为x轴正方向与y轴正方向的坐标系，而世界坐标系就是更大更广阔的坐标系，任何的一切都是在世界坐标系下运转也就是只有在需要绘制时我们才考虑将他们防止到窗口坐标系下进行绘制等操作（比如Minecraft中打开F4看到的整个世界的坐标系，而玩家作为原点，加载范围左上角与右下角为终点的坐标系就是窗口坐标系），摄像机是世界坐标系与窗口坐标系之间转换的利器。
+
+以上的设计思路正好符合最开始的设计理念，也就是数据与渲染分离，在不考虑缩放的情况下，如果摄像头画面与窗口画面大小一致时，摄像头可以看作在世界坐标系中的一个点，且这个点与玩家坐标位置始终保持一致，渲染场景中其他物体只需要将其他物体世界坐标与当前摄像机点位坐标做差得出位置，就是实际渲染位置：窗口坐标 = 世界坐标 - 摄像机坐标。
+
+不过在编写Camera之前，我需要先对之前的动画类功能测试，以便摄像头类中可以使用。
+
+### 动画类的测试与使用
+
+首先来到menuScene.h中，引入atlas.h头文件与animation.h并使用extern声明外部动画图集，随后在MenuScene私有成员中定义Animation对象m_animation_gamer1_run_right并在成员函数on_enter中设置所使用的图集，帧间隔与循环状态
+
+```
+//头文件引入及外部变量引入，注意这里的顺序不然下面会报错
+#include "atlas.h"
+#include "animation.h"
+#include "scene.h"
+#include "sceneManager.h"
+
+extern Atlas atlas_gamer1_run_right;
+
+//MenuScene私有成员变量
+Animation m_animation_gamer1_run_right;
+
+//MenuScene成员函数on_enter初始化，这里如果出现参数不匹配就是头文件顺序需要调整
+this->m_animation_gamer1_run_right.setAtlas(&atlas_gamer1_run_right);
+this->m_animation_gamer1_run_right.setInterval(75);
+this->m_animation_gamer1_run_right.setLoop(true);
+
+```
+
+
+
+我们接下来接下来需要进行on_updata编写但是发现，缺少了一个实际运行时间参数的传入，所以此处就需要小幅度重构代码了，首先是场景基类scene.h头文件中，对on_updata方法添加int delta表示实际时间参数随后给menuScene.h，gameScene.h，selectorScene.h中为重构的on_updata添加参数，以及对sceneManager.h中同样添加上on_updata的参数，对main.h中调用on_updata处传入参数即可。
+
+```
+//scene.h中重构
+virtual void on_update(int delta) {}
+
+//menuScene.h中重构
+virtual void on_update(int delta)
+
+//selectorScene.h中重构
+virtual void on_update(int delta)
+
+//gameScene.h中重构
+virtual void on_update(int delta)
+
+//sceneManager.h中重构
+void on_updata(int delta)
+{
+    this->m_current_scene->on_update(delta);
+}
+
+//main.h中重写解决方案，通过getTickCount获取并计算上次调用时间间隔，来传入参数
+static DWORD last_tick_time = GetTickCount();
+DWORD current_tick_time = GetTickCount();
+DWORD delta_tick_time = current_tick_time - last_tick_time;
+scene_manager.on_updata(delta_tick_time);
+last_tick_time = current_tick_time;
+
+```
+
+
+
+这个插曲可以注意到，一开始没有考虑好代码结构的设计是多糟糕的事情，一旦出现错误就需要翻遍整个项目进行修改，虽然对于新手出现类似的问题是正常的情况，属于是缺乏程序设计方面的经验，也是学习过程中必须要经历的问题，积累经验才能学会。
+
+回到menuScene.h头文件的MenuScene类的on_draw方法中调用成员函数animation中的on_draw方法渲染在100，100位置处，运行程序能够正确看到渲染内容即成功。
+
+```
+//MenuScene类中修改如下代码
+virtual void on_update(int delta)
+{
+	this->m_animation_gamer1_run_right.on_update(delta);
+}
+
+virtual void on_draw()
+{
+	this->m_animation_gamer1_run_right.on_draw(100, 100);
+}
+```
+

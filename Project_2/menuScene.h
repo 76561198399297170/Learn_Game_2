@@ -1,10 +1,12 @@
 #ifndef _MENU_SCENE_H_
 #define _MENU_SCENE_H_
 
-#include "scene.h"
 #include "sceneManager.h"
+#include "animation.h"
 
 #include <iostream>
+
+extern Atlas atlas_gamer1_run_right;
 
 extern SceneManager scene_manager;
 
@@ -16,17 +18,19 @@ public:
 
 	virtual void on_enter()
 	{
-		std::cout << "进入主菜单！" << std::endl;
+		this->m_animation_gamer1_run_right.setAtlas(&atlas_gamer1_run_right);
+		this->m_animation_gamer1_run_right.setInterval(75);
+		this->m_animation_gamer1_run_right.setLoop(true);
 	}
 
-	virtual void on_update()
+	virtual void on_update(int delta)
 	{
-		std::cout << "主菜单运行中..." << std::endl;
+		this->m_animation_gamer1_run_right.on_update(delta);
 	}
 
 	virtual void on_draw()
 	{
-		outtextxy(10, 10, L"主菜单绘制");
+		this->m_animation_gamer1_run_right.on_draw(100, 100);
 	}
 
 	virtual void on_input(const ExMessage& msg)
@@ -43,6 +47,7 @@ public:
 	}
 
 private:
+	Animation m_animation_gamer1_run_right;
 
 };
 
