@@ -1099,3 +1099,753 @@ public:
 
 
 ## 第三节
+
+### 图片翻转
+
+大部分包括我们本次项目，角色的左右移动序列帧图像仅仅只是水平镜像的差异，所以本次项目只提供了向右序列帧的，而向左序列帧则可以通过图片像素进行动态生成，和Animation强相关的Atlas类还有一个功能未完成，就是水平翻转，图片像素翻转需要对每个像素逐个处理，是一个相对耗时的操作所以这个操作需要在游戏初始化阶段完成，思路上通过加载图集向右图片遍历每一张并将其拷到向左图集中。
+
+首先定义一个utils.h工具类头文件，编写flipImage翻转图片函数，包含两个参数翻转目标图片与翻转结果图片，借助GetImageBuffer函数对像素进行操作：
+
+```
+#ifndef _UTILS_H_
+#define _UTILS_H_
+
+#include <graphics.h>
+
+inline void flipImage(IMAGE* src, IMAGE* dst)
+{
+	int w = src->getwidth(), h = src->getheight();
+	Resize(dst, w, h);
+	
+	DWORD* src_buffer = GetImageBuffer(src);
+	DWORD* dst_buffer = GetImageBuffer(dst);
+	for (int i = 0; i < h; i++)
+	{
+		for (int j = 0; j < w; j++)
+		{
+			int src_idx = i * w + j, dst_idx = (i + 1) * w - j - 1;
+			dst_buffer[dst_idx] = src_buffer[src_idx];
+		}
+	}
+	return;
+}
+
+#endif
+```
+
+
+
+接下来可以进行数据加载了，在main.cpp中引入utils.h和atlas.h，并定义图集翻转（注意这里是图集，前面的是图片）函数，首先清空目标图集防止复用时出现问题，随后原图集中每一帧图片都执行flipImage操作并提供addImage添加图集：
+
+```
+#include "atlas.h"
+#include "utils.h"
+
+void flipAtlas(Atlas& src, Atlas& dst)
+{
+	dst.clear();
+	for (int i = 0; i < src.getSize(); i++)
+	{
+		IMAGE img_flpipped;
+		flipImage(src.getImage(i), &img_flpipped);
+		dst.addImage(img_flpipped);
+	}
+}
+```
+
+
+
+### 图像加载
+
+接下来可以将素材中内容放到项目工程中的resources目录下，并在main.cpp下编写loadGameResources函数加载资源，由于本项目较小，所以为方便后续开发过程中直接使用，而非使用时跳转回来添加新的资源家啊在逻辑，目前阶段选择将整个程序所需资源全部加载。
+
+首先是所需的图片图集变量定义在全局环境并注意起名（最好有意义并且包含未知朝向等信息），对应的在loadAGameResources函数中进行加载：
+
+```
+//因使用了mciSendString所以全局区需要包含对应库
+#pragma comment(lib, "Winmm.lib")
+
+IMAGE img_menu_background;					//主菜单背景图片
+
+IMAGE img_VS;								//VS 艺术字图片
+IMAGE img_1P;								//1P 文本图片
+IMAGE img_2P;								//2P 文本图片
+IMAGE img_1P_desc;							//1P 键位描述图片
+IMAGE img_2P_desc;							//2P 键位描述图片
+IMAGE img_select_background__left;			//选人朝左背景图片
+IMAGE img_select_background_right;			//选人朝右背景图片
+IMAGE img_selector_tip;						//选人界面提示信息
+IMAGE img_selector_background;				//选人界面背景图
+IMAGE img_1P_selector_btn_idle_left;		//1P 向左选择按钮默认状态图片
+IMAGE img_1P_selector_btn_idle_right;		//1P 向右选择按钮默认状态图片
+IMAGE img_1P_selector_btn_down_left;		//1P 向左选择按钮按下状态图片
+IMAGE img_1P_selector_btn_down_right;		//1P 向右选择按钮按下状态图片
+IMAGE img_2P_selector_btn_idle_left;		//2P 向左选择按钮默认状态图片
+IMAGE img_2P_selector_btn_idle_right;		//2P 向右选择按钮默认状态图片
+IMAGE img_2P_selector_btn_down_left;		//2P 向左选择按钮按下状态图片
+IMAGE img_2P_selector_btn_down_right;		//2P 向右选择按钮按下状态图片
+IMAGE img_gamer1_selector_background_left;	//选人界面类型1朝左背景图片
+IMAGE img_gamer1_selector_background_right;	//选人界面类型1朝右北京图片
+IMAGE img_gamer2_selector_background_left;	//选人界面类型2朝左背景图片
+IMAGE img_gamer2_selector_background_right;	//选人界面类型2朝右北京图片
+
+IMAGE img_sky;								//填空图片
+IMAGE img_hills;							//山脉图片
+IMAGE img_platform_large;					//大型平台图片
+IMAGE img_platform_small;					//小型平台图片
+
+IMAGE img_1P_cursor;						//1P 指示光标图片
+IMAGE img_2P_cursor;						//2P 指示光标图片
+
+Atlas atlas_gamer1_idle_left;				//类型1向左默认动画图集
+Atlas atlas_gamer1_idle_right;				//类型1向右默认动画图集
+Atlas atlas_gamer1_run_left;				//类型1向左奔跑动画图集
+Atlas atlas_gamer1_run_right;				//类型1向右奔跑动画图集
+Atlas atlas_gamer1_attack_ex_left;			//类型1向左特殊攻击动画图集
+Atlas atlas_gamer1_attack_ex_right;			//类型1向右特殊攻击动画图集
+Atlas atlas_gamer1_die_left;				//类型1向左死亡动画图集
+Atlas atlas_gamer1_die_right;				//类型1向右死亡动画图集
+
+Atlas atlas_gamer2_idle_left;				//类型2向左默认动画图集
+Atlas atlas_gamer2_idle_right;				//类型2向右默认动画图集
+Atlas atlas_gamer2_run_left;				//类型2向左奔跑动画图集
+Atlas atlas_gamer2_run_right;				//类型2向右奔跑动画图集
+Atlas atlas_gamer2_attack_ex_left;			//类型2向左特殊攻击动画图集
+Atlas atlas_gamer2_attack_ex_right;			//类型2向右特殊攻击动画图集
+Atlas atlas_gamer2_die_left;				//类型2向左死亡动画图集
+Atlas atlas_gamer2_die_right;				//类型2向右死亡动画图集
+
+IMAGE img_gamer1_bullet;					//类型1子弹图片
+Atlas atlas_gamer1_bullet_break;			//类型1子弹破碎动画图集
+Atlas atlas_gemer2_bullet;					//类型2子弹动画图集
+Atlas atlas_gemer2_bullet_explode;			//类型2子弹爆炸动画图集
+Atlas atlas_gamer2_bullet_ex;				//类型2特殊类型子弹动画图集
+Atlas atlas_gamer2_bullet_ex_explode;		//类型2特殊类型子弹爆炸动画图集
+Atlas atlas_gamer2_bullet_text;				//类型2特殊类型子弹爆炸文本动画图集
+
+Atlas atlas_run_effect;						//奔跑特效动画图集
+Atlas atlas_jump_effect;					//跳跃特效动画图集
+Atlas atlas_land_effect;					//落地特效动画图集
+
+IMAGE img_winner_bar;						//获胜玩家背景图片
+IMAGE img_1P_winner;						//1P 获胜文本图片
+IMAGE img_2P_winner;						//2P 获胜文本图片
+
+IMAGE img_avatar_gamer1;					//类型1头像图片
+IMAGE img_avatar_gamer2;					//类型2头像图片
+
+void loadGameResources()
+{
+	AddFontResourceEx(L"./resources/HYPixel11pxU-2.ttf", FR_PRIVATE, NULL);
+
+	loadimage(&img_menu_background, L"./resources/menu_background.png");
+	loadimage(&img_1P, L"./resources/1P.png");
+	loadimage(&img_2P, L"./resources/2P.png");
+	loadimage(&img_1P_desc, L"./resources/1P_dest.png");
+	loadimage(&img_2P_desc, L"./resources/2P_dest.png");
+	loadimage(&img_select_background_right, L"./resources/select_background.png");
+	flipImage(&img_select_background_right, &img_select_background_left);
+	loadimage(&img_selector_tip, L"./resources/selector_tip.png");
+	loadimage(&img_selector_background, L"./resoources/selector_background.png");
+	loadimage(&img_1P_selector_btn_idle_right, L"./resources/1P_selector_btn_idle.png");
+	flipImage(&img_1P_selector_btn_idle_right, &img_1P_selector_btn_idle_left);
+	loadimage(&img_1P_selector_btn_down_right, L"./resources/1P_selector_btn_down.png");
+	flipImage(&img_1P_selector_btn_down_right, &img_1P_selector_btn_down_left);
+	loadimage(&img_2P_selector_btn_idle_right, L"./resources/2P_selector_btn_idle.png");
+	flipImage(&img_2P_selector_btn_idle_right, &img_2P_selector_btn_idle_left);
+	loadimage(&img_2P_selector_btn_down_right, L"./resources/2P_selector_btn_down.png");
+	flipImage(&img_2P_selector_btn_down_right, &img_2P_selector_btn_down_left);
+	loadimage(&img_gamer1_selector_background_right, L"./resources/gamer1_selector_background.png");
+	flipImage(&img_gamer1_selector_background_right, &img_gamer1_selector_background_left);
+	loadimage(&img_gamer2_selector_background_right, L"./resources/gamer2_selector_background.png");
+	flipImage(&img_gamer2_selector_background_right, &img_gamer2_selector_background_left);
+
+	loadimage(&img_sky, L"./resources/sky.png");
+	loadimage(&img_hills, L"./resources/hills.png");
+	loadimage(&img_platform_large, L"./resources/platform_large.png");
+	loadimage(&img_platform_small, L"./resources/platform_small.png");
+
+	loadimage(&img_1P_cursor, L"./resources/1P_cursor.png");
+	loadimage(&img_2P_cursor, L"./resources/2P_cursor.png");
+
+	atlas_gamer1_idle_right.loadFromFile(L"./resources/gamer1_idle_%d.png", 9);
+	flipAtlas(atlas_gamer1_idle_right, atlas_gamer1_idle_left);
+	atlas_gamer1_run_right.loadFromFile(L"./resources/gamer1_run_%d.png", 5);
+	flipAtlas(atlas_gamer1_run_right, atlas_gamer1_run_left);
+	atlas_gamer1_attack_ex_right.loadFromFile(L"./resources/gamer1_attack_ex_%d.png", 3);
+	flipAtlas(atlas_gamer1_attack_ex_right, atlas_gamer1_attack_ex_left);
+	atlas_gamer1_die_right.loadFromFile(L"./resources/gamer1_die_%d.png", 4);
+	flipAtlas(atlas_gamer1_die_right, atlas_gamer1_die_left);
+
+	atlas_gamer2_idle_right.loadFromFile(L"./resources/gamer2_idle_%d.png", 8);
+	flipAtlas(atlas_gamer2_idle_right, atlas_gamer2_idle_left);
+	atlas_gamer2_run_right.loadFromFile(L"./resources/gamer2_run_%d.png", 5);
+	flipAtlas(atlas_gamer2_run_right, atlas_gamer2_run_left);
+	atlas_gamer2_attack_ex_right.loadFromFile(L"./resources/gamer2_attack_ex_%d.png", 9);
+	flipAtlas(atlas_gamer2_attack_ex_right, atlas_gamer2_attack_ex_left);
+	atlas_gamer2_die_right.loadFromFile(L"./resources/gamer2_die_%d.png", 2);
+	flipAtlas(atlas_gamer2_die_right, atlas_gamer2_die_left);
+
+	loadimage(&img_gamer1_bullet, L"./resources/gamer_bullet.png");
+	atlas_gamer1_bullet_break.loadFromFile(L"./resources/gamer1_bullet_break_%d.png", 3);
+	atlas_gemer2_bullet.loadFromFile(L"./resources/gamer2_bullet_%d.png", 5);
+	atlas_gemer2_bullet_explode.loadFromFile(L"./resources/gamer2_bullet_explode_%d.png", 5);
+	atlas_gamer2_bullet_ex.loadFromFile(L"./resources/gamer2_bullet_ex_%d.png", 5);
+	atlas_gamer2_bullet_ex_explode.loadFromFile(L"./resources/gamer2_bullet_ex_explode_%d.png", 5);
+	atlas_gamer2_bullet_text.loadFromFile(L"./resources/gamer2_bullet_text_%d.png", 6);
+
+	atlas_run_effect.loadFromFile(L"./resources/run_effect_%d.png", 4);
+	atlas_jump_effect.loadFromFile(L"./resources/jump_effect_%d.png", 5);
+	atlas_land_effect.loadFromFile(L"./resources/land_effect_%d.png", 2);
+
+	loadimage(&img_1P_winner, L"./resources/1P_winner.png");
+	loadimage(&img_2P_winner, L"./resources/2P_winner.png");
+	loadimage(&img_winner_bar, L"./resources/winner_bar.png");
+
+	loadimage(&img_avatar_gamer1, L"./resources/avatar_gamer1.png");
+	loadimage(&img_avatar_gamer2, L"./resources/avatar_gamer2.png");
+
+	mciSendString(L"open ./resources/bgm_game.mp3 alias bgm_game", NULL, 0, NULL);
+	mciSendString(L"open ./resources/bgm_menu.mp3 alias bgm_menu", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer1_bullet_break_1.mp3 alias gamer1_bullet_break_1", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer1_bullet_break_2.mp3 alias gamer1_bullet_break_2", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer1_bullet_break_3.mp3 alias gamer1_bullet_break_3", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer1_bullet_shoot_1.mp3 alias gamer1_bullet_shoot_1", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer1_bullet_shoot_2.mp3 alias gamer1_bullet_shoot_2", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer1_bullet_shoot_ex.mp3 alias gamer1_bullet_shoot_ex", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer2_bullet_explode.mp3 alias gamer2_bullet_explode", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer2_bullet_explode_ex.mp3 alias gamer2_bullet_explode_ex", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer2_bullet_text.mp3 alias gamer2_bullet_text", NULL, 0, NULL);
+	mciSendString(L"open ./resources/ui_confirm.wav alias ui_confirm", NULL, 0, NULL);
+	mciSendString(L"open ./resources/ui_switch.wav alias ui_switch", NULL, 0, NULL);
+	mciSendString(L"open ./resources/ui_win.wav alias ui_win", NULL, 0, NULL);
+
+	return;
+}
+
+//在加载资源处注意调用该函数
+
+```
+
+
+
+编写代码时（除非是新手为了熟悉关键字）应当学会借助编译器代码提示工具补全变量，提高开发效率。
+
+### 动画类实现
+
+创建Animation.h文件以及动画类，然后依旧是考虑成员变量与成员函数，成员变量一般决定这个类的数据属性，而成员函数则是根据这些数据属性选择对外提供何种的增删改查接口。
+
+正如开始的设计数量动画类必然需要持有图集Atlas引用，所以引入atlas.h文件并声明类内私有成员Atlas指针默认nullptr，随后添加各种成员变量如：计时器，帧间隔，帧索引与动画是否循环标记。
+
+成员函数方面提供reset函数将计时器与下标索引重置，setAtlas设置图集方法，setLoop设置是否循环播放，setInterval设置帧间隔，getIndexFrame获取当前播放序列帧下标，getFrame获取当前播放动画帧图片，checkFinished查看是否结束播放的方法。
+
+最后就是动画更新逻辑部分，定义on_update更新方法逻辑与之前基本相同，以及on_draw方法，不过需要先在utils.h中编写putImageAlpha方法解决putImage方法不接受透明度通道的情况，记得需要添加MSIMG32.LIB库。
+
+```
+#ifndef _ANIMATION_H_
+#define _ANIMATION_H_
+
+#include "atlas.h"
+#include "utiles.h
+
+class Animation
+{
+public:
+	Animation() = default;
+	~Animation() = default;
+
+	void reset()
+	{
+		this->m_timer = 0;
+		this->m_idx_frame = 0;
+	}
+
+	void setAtlas(Atlas* new_atlas)
+	{
+		this->reset();
+		this->m_atlas = new_atlas;
+	}
+
+	void setLoop(bool is_loop)
+	{
+		this->is_loop = is_loop;
+	}
+
+	void setInterval(int ms)
+	{
+		this->m_interval = ms;
+	}
+
+	int getIndexFrame()
+	{
+		return this->m_idx_frame;
+	}
+
+	IMAGE* getFrame()
+	{
+		return this->m_atlas->getImage(this->m_idx_frame);
+	}
+
+	bool checkFinished()
+	{
+		if (this->is_loop) return false;
+
+		return this->m_idx_frame == this->m_atlas->getSize() - 1;
+	}
+
+	void on_update(int delta)
+	{
+		this->m_timer += delta;
+		if (this->m_timer >= this->m_interval)
+		{
+			this->m_timer = 0;
+			this->m_idx_frame++;
+			if (this->m_idx_frame >= this->m_atlas->getSize())
+			{
+				this->m_idx_frame = (this->is_loop ? 0 : this->m_atlas->getSize() - 1);
+			}
+		}
+	}
+
+	void on_draw(int x, int y) const
+	{
+		putImageAlpha(x, y, this->m_atlas->getImage(this->m_idx_frame));
+	}
+
+private:
+	int m_timer = 0;
+	int m_interval = 0;
+	int m_idx_frame = 0;
+
+	bool is_loop = true;
+
+	Atlas* m_atlas = nullptr;
+
+};
+
+#endif
+
+//utils.h下添加编写putImageAlpha方法，基本不变
+#pragma comment(lib, "MSIMG32.LIB")
+
+void putImageAlpha(int dst_x, int dst_y, IMAGE* img)
+{
+	int w = img->getwidth(), h = img->getheight();
+
+	AlphaBlend(GetImageHDC(GetWorkingImage()), dst_x, dst_y, w, h, GetImageHDC(img), 0, 0, w, h, { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA });
+}
+
+```
+
+
+
+### 生命周期结束动画播放逻辑
+
+在生命周期结束时消失动画通常较为常用，这部分的逻辑又该如何编写？想要播放死亡动画但由于敌人死亡时直接删除了Enemy对象导致无法正常播放，解决方法很简单关键在于延后这些存在消失动画被删除的时间，即物品“死亡”时播放死亡动画，死亡动画播放结束再删除对象。
+
+这就需要动画层面提供一个动画播放结束的消息，当然也可以在动画更新时使用checkFinished方法检查是否播放结束，但这里右更优雅更好的方式即回调函数，即使用参数传递的函数对象使用变量存储，再在合适时调用，例如将删除对象的方法保存，在死亡动画播放完毕时调用回调函数将对象删除来实现我们的目的。
+
+在animation.h中添加头文件functional并在成员变量中添加std::function\<void\(\)\> m_callback变量，随后提供setCallback函数设置方法，并修改on_updata中逻辑部分：
+
+```
+//头文件
+#include <functional>
+
+//Animation类内成员变量callback回调函数
+std::function<void()> m_callback;
+
+//Animation类内成员函数setCallback方法
+void setCallBack(std::function<void()> callback)
+{
+    this->m_callback = callback;
+}
+
+//添加下标越界后的询问是否调用回调函数
+if (!this->is_loop && this->m_callback)
+{
+    this->m_callback();
+}
+```
+
+
+
+## 第三节代码完成展示
+
+**main.cpp**
+
+```
+#include "scene.h"
+#include "menuScene.h"
+#include "gameScene.h"
+#include "selectorScene.h"
+#include "sceneManager.h"
+#include "atlas.h"
+#include "utils.h"
+
+#pragma comment(lib, "Winmm.lib")
+
+#include <graphics.h>
+
+const int FPS = 60;
+
+IMAGE img_menu_background;					//主菜单背景图片
+
+IMAGE img_VS;								//VS 艺术字图片
+IMAGE img_1P;								//1P 文本图片
+IMAGE img_2P;								//2P 文本图片
+IMAGE img_1P_desc;							//1P 键位描述图片
+IMAGE img_2P_desc;							//2P 键位描述图片
+IMAGE img_select_background_left;			//选人朝左背景图片
+IMAGE img_select_background_right;			//选人朝右背景图片
+IMAGE img_selector_tip;						//选人界面提示信息
+IMAGE img_selector_background;				//选人界面背景图
+IMAGE img_1P_selector_btn_idle_left;		//1P 向左选择按钮默认状态图片
+IMAGE img_1P_selector_btn_idle_right;		//1P 向右选择按钮默认状态图片
+IMAGE img_1P_selector_btn_down_left;		//1P 向左选择按钮按下状态图片
+IMAGE img_1P_selector_btn_down_right;		//1P 向右选择按钮按下状态图片
+IMAGE img_2P_selector_btn_idle_left;		//2P 向左选择按钮默认状态图片
+IMAGE img_2P_selector_btn_idle_right;		//2P 向右选择按钮默认状态图片
+IMAGE img_2P_selector_btn_down_left;		//2P 向左选择按钮按下状态图片
+IMAGE img_2P_selector_btn_down_right;		//2P 向右选择按钮按下状态图片
+IMAGE img_gamer1_selector_background_left;	//选人界面类型1朝左背景图片
+IMAGE img_gamer1_selector_background_right;	//选人界面类型1朝右背景图片
+IMAGE img_gamer2_selector_background_left;	//选人界面类型2朝左背景图片
+IMAGE img_gamer2_selector_background_right;	//选人界面类型2朝右背景图片
+
+IMAGE img_sky;								//填空图片
+IMAGE img_hills;							//山脉图片
+IMAGE img_platform_large;					//大型平台图片
+IMAGE img_platform_small;					//小型平台图片
+
+IMAGE img_1P_cursor;						//1P 指示光标图片
+IMAGE img_2P_cursor;						//2P 指示光标图片
+
+Atlas atlas_gamer1_idle_left;				//类型1向左默认动画图集
+Atlas atlas_gamer1_idle_right;				//类型1向右默认动画图集
+Atlas atlas_gamer1_run_left;				//类型1向左奔跑动画图集
+Atlas atlas_gamer1_run_right;				//类型1向右奔跑动画图集
+Atlas atlas_gamer1_attack_ex_left;			//类型1向左特殊攻击动画图集
+Atlas atlas_gamer1_attack_ex_right;			//类型1向右特殊攻击动画图集
+Atlas atlas_gamer1_die_left;				//类型1向左死亡动画图集
+Atlas atlas_gamer1_die_right;				//类型1向右死亡动画图集
+
+Atlas atlas_gamer2_idle_left;				//类型2向左默认动画图集
+Atlas atlas_gamer2_idle_right;				//类型2向右默认动画图集
+Atlas atlas_gamer2_run_left;				//类型2向左奔跑动画图集
+Atlas atlas_gamer2_run_right;				//类型2向右奔跑动画图集
+Atlas atlas_gamer2_attack_ex_left;			//类型2向左特殊攻击动画图集
+Atlas atlas_gamer2_attack_ex_right;			//类型2向右特殊攻击动画图集
+Atlas atlas_gamer2_die_left;				//类型2向左死亡动画图集
+Atlas atlas_gamer2_die_right;				//类型2向右死亡动画图集
+
+IMAGE img_gamer1_bullet;					//类型1子弹图片
+Atlas atlas_gamer1_bullet_break;			//类型1子弹破碎动画图集
+Atlas atlas_gemer2_bullet;					//类型2子弹动画图集
+Atlas atlas_gemer2_bullet_explode;			//类型2子弹爆炸动画图集
+Atlas atlas_gamer2_bullet_ex;				//类型2特殊类型子弹动画图集
+Atlas atlas_gamer2_bullet_ex_explode;		//类型2特殊类型子弹爆炸动画图集
+Atlas atlas_gamer2_bullet_text;				//类型2特殊类型子弹爆炸文本动画图集
+
+Atlas atlas_run_effect;						//奔跑特效动画图集
+Atlas atlas_jump_effect;					//跳跃特效动画图集
+Atlas atlas_land_effect;					//落地特效动画图集
+
+IMAGE img_winner_bar;						//获胜玩家背景图片
+IMAGE img_1P_winner;						//1P 获胜文本图片
+IMAGE img_2P_winner;						//2P 获胜文本图片
+
+IMAGE img_avatar_gamer1;					//类型1头像图片
+IMAGE img_avatar_gamer2;					//类型2头像图片
+
+Scene* menu_scene = nullptr;
+Scene* game_scene = nullptr;
+Scene* selector_scene = nullptr;
+
+SceneManager scene_manager;
+
+void flipAtlas(Atlas& src, Atlas& dst)
+{
+	dst.clear();
+	for (int i = 0; i < src.getSize(); i++)
+	{
+		IMAGE img_flpipped;
+		flipImage(src.getImage(i), &img_flpipped);
+		dst.addImage(img_flpipped);
+	}
+}
+
+void loadGameResources()
+{
+	AddFontResourceEx(L"./resources/HYPixel11pxU-2.ttf", FR_PRIVATE, NULL);
+
+	loadimage(&img_menu_background, L"./resources/menu_background.png");
+	loadimage(&img_1P, L"./resources/1P.png");
+	loadimage(&img_2P, L"./resources/2P.png");
+	loadimage(&img_1P_desc, L"./resources/1P_dest.png");
+	loadimage(&img_2P_desc, L"./resources/2P_dest.png");
+	loadimage(&img_select_background_right, L"./resources/select_background.png");
+	flipImage(&img_select_background_right, &img_select_background_left);
+	loadimage(&img_selector_tip, L"./resources/selector_tip.png");
+	loadimage(&img_selector_background, L"./resoources/selector_background.png");
+	loadimage(&img_1P_selector_btn_idle_right, L"./resources/1P_selector_btn_idle.png");
+	flipImage(&img_1P_selector_btn_idle_right, &img_1P_selector_btn_idle_left);
+	loadimage(&img_1P_selector_btn_down_right, L"./resources/1P_selector_btn_down.png");
+	flipImage(&img_1P_selector_btn_down_right, &img_1P_selector_btn_down_left);
+	loadimage(&img_2P_selector_btn_idle_right, L"./resources/2P_selector_btn_idle.png");
+	flipImage(&img_2P_selector_btn_idle_right, &img_2P_selector_btn_idle_left);
+	loadimage(&img_2P_selector_btn_down_right, L"./resources/2P_selector_btn_down.png");
+	flipImage(&img_2P_selector_btn_down_right, &img_2P_selector_btn_down_left);
+	loadimage(&img_gamer1_selector_background_right, L"./resources/gamer1_selector_background.png");
+	flipImage(&img_gamer1_selector_background_right, &img_gamer1_selector_background_left);
+	loadimage(&img_gamer2_selector_background_right, L"./resources/gamer2_selector_background.png");
+	flipImage(&img_gamer2_selector_background_right, &img_gamer2_selector_background_left);
+
+	loadimage(&img_sky, L"./resources/sky.png");
+	loadimage(&img_hills, L"./resources/hills.png");
+	loadimage(&img_platform_large, L"./resources/platform_large.png");
+	loadimage(&img_platform_small, L"./resources/platform_small.png");
+
+	loadimage(&img_1P_cursor, L"./resources/1P_cursor.png");
+	loadimage(&img_2P_cursor, L"./resources/2P_cursor.png");
+
+	atlas_gamer1_idle_right.loadFromFile(L"./resources/gamer1_idle_%d.png", 9);
+	flipAtlas(atlas_gamer1_idle_right, atlas_gamer1_idle_left);
+	atlas_gamer1_run_right.loadFromFile(L"./resources/gamer1_run_%d.png", 5);
+	flipAtlas(atlas_gamer1_run_right, atlas_gamer1_run_left);
+	atlas_gamer1_attack_ex_right.loadFromFile(L"./resources/gamer1_attack_ex_%d.png", 3);
+	flipAtlas(atlas_gamer1_attack_ex_right, atlas_gamer1_attack_ex_left);
+	atlas_gamer1_die_right.loadFromFile(L"./resources/gamer1_die_%d.png", 4);
+	flipAtlas(atlas_gamer1_die_right, atlas_gamer1_die_left);
+
+	atlas_gamer2_idle_right.loadFromFile(L"./resources/gamer2_idle_%d.png", 8);
+	flipAtlas(atlas_gamer2_idle_right, atlas_gamer2_idle_left);
+	atlas_gamer2_run_right.loadFromFile(L"./resources/gamer2_run_%d.png", 5);
+	flipAtlas(atlas_gamer2_run_right, atlas_gamer2_run_left);
+	atlas_gamer2_attack_ex_right.loadFromFile(L"./resources/gamer2_attack_ex_%d.png", 9);
+	flipAtlas(atlas_gamer2_attack_ex_right, atlas_gamer2_attack_ex_left);
+	atlas_gamer2_die_right.loadFromFile(L"./resources/gamer2_die_%d.png", 2);
+	flipAtlas(atlas_gamer2_die_right, atlas_gamer2_die_left);
+
+	loadimage(&img_gamer1_bullet, L"./resources/gamer_bullet.png");
+	atlas_gamer1_bullet_break.loadFromFile(L"./resources/gamer1_bullet_break_%d.png", 3);
+	atlas_gemer2_bullet.loadFromFile(L"./resources/gamer2_bullet_%d.png", 5);
+	atlas_gemer2_bullet_explode.loadFromFile(L"./resources/gamer2_bullet_explode_%d.png", 5);
+	atlas_gamer2_bullet_ex.loadFromFile(L"./resources/gamer2_bullet_ex_%d.png", 5);
+	atlas_gamer2_bullet_ex_explode.loadFromFile(L"./resources/gamer2_bullet_ex_explode_%d.png", 5);
+	atlas_gamer2_bullet_text.loadFromFile(L"./resources/gamer2_bullet_text_%d.png", 6);
+
+	atlas_run_effect.loadFromFile(L"./resources/run_effect_%d.png", 4);
+	atlas_jump_effect.loadFromFile(L"./resources/jump_effect_%d.png", 5);
+	atlas_land_effect.loadFromFile(L"./resources/land_effect_%d.png", 2);
+
+	loadimage(&img_1P_winner, L"./resources/1P_winner.png");
+	loadimage(&img_2P_winner, L"./resources/2P_winner.png");
+	loadimage(&img_winner_bar, L"./resources/winner_bar.png");
+
+	loadimage(&img_avatar_gamer1, L"./resources/avatar_gamer1.png");
+	loadimage(&img_avatar_gamer2, L"./resources/avatar_gamer2.png");
+
+	mciSendString(L"open ./resources/bgm_game.mp3 alias bgm_game", NULL, 0, NULL);
+	mciSendString(L"open ./resources/bgm_menu.mp3 alias bgm_menu", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer1_bullet_break_1.mp3 alias gamer1_bullet_break_1", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer1_bullet_break_2.mp3 alias gamer1_bullet_break_2", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer1_bullet_break_3.mp3 alias gamer1_bullet_break_3", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer1_bullet_shoot_1.mp3 alias gamer1_bullet_shoot_1", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer1_bullet_shoot_2.mp3 alias gamer1_bullet_shoot_2", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer1_bullet_shoot_ex.mp3 alias gamer1_bullet_shoot_ex", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer2_bullet_explode.mp3 alias gamer2_bullet_explode", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer2_bullet_explode_ex.mp3 alias gamer2_bullet_explode_ex", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer2_bullet_text.mp3 alias gamer2_bullet_text", NULL, 0, NULL);
+	mciSendString(L"open ./resources/ui_confirm.wav alias ui_confirm", NULL, 0, NULL);
+	mciSendString(L"open ./resources/ui_switch.wav alias ui_switch", NULL, 0, NULL);
+	mciSendString(L"open ./resources/ui_win.wav alias ui_win", NULL, 0, NULL);
+
+	return;
+}
+
+int main()
+{
+	ExMessage msg;
+
+	loadGameResources();
+	
+	initgraph(1200, 720);
+
+	menu_scene = new MenuScene();
+	game_scene = new GameScene();
+	selector_scene = new SelectorScene();
+	scene_manager.setCurrentState(menu_scene);
+
+	BeginBatchDraw();
+	while (true)
+	{
+		DWORD frame_start_time = GetTickCount();
+
+		while (peekmessage(&msg))
+		{
+			scene_manager.on_input(msg);
+		}
+		scene_manager.on_updata();
+
+		cleardevice();
+		scene_manager.on_draw();
+
+		FlushBatchDraw();
+
+		DWORD frame_end_time = GetTickCount();
+		DWORD frame_delta_time = frame_end_time - frame_start_time;
+		if (frame_delta_time < 1000 / FPS)
+		{
+			Sleep(1000 / FPS - frame_delta_time);
+		}
+
+	}
+	EndBatchDraw();
+
+	return 0;
+}
+```
+
+**utils.h**
+
+```
+#ifndef _UTILS_H_
+#define _UTILS_H_
+
+#pragma comment(lib, "MSIMG32.LIB")
+
+#include <graphics.h>
+
+void putImageAlpha(int dst_x, int dst_y, IMAGE* img)
+{
+	int w = img->getwidth(), h = img->getheight();
+
+	AlphaBlend(GetImageHDC(GetWorkingImage()), dst_x, dst_y, w, h, GetImageHDC(img), 0, 0, w, h, { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA });
+}
+
+inline void flipImage(IMAGE* src, IMAGE* dst)
+{
+	int w = src->getwidth(), h = src->getheight();
+	Resize(dst, w, h);
+	
+	DWORD* src_buffer = GetImageBuffer(src);
+	DWORD* dst_buffer = GetImageBuffer(dst);
+	for (int i = 0; i < h; i++)
+	{
+		for (int j = 0; j < w; j++)
+		{
+			int src_idx = i * w + j, dst_idx = (i + 1) * w - j - 1;
+			dst_buffer[dst_idx] = src_buffer[src_idx];
+		}
+	}
+	return;
+}
+
+#endif
+```
+
+**animation.h**
+
+```
+#ifndef _ANIMATION_H_
+#define _ANIMATION_H_
+
+#include <functional>
+
+#include "atlas.h"
+#include "utils.h"
+
+class Animation
+{
+public:
+	Animation() = default;
+	~Animation() = default;
+
+	void reset()
+	{
+		this->m_timer = 0;
+		this->m_idx_frame = 0;
+	}
+
+	void setAtlas(Atlas* new_atlas)
+	{
+		this->reset();
+		this->m_atlas = new_atlas;
+	}
+
+	void setLoop(bool is_loop)
+	{
+		this->is_loop = is_loop;
+	}
+
+	void setInterval(int ms)
+	{
+		this->m_interval = ms;
+	}
+
+	int getIndexFrame()
+	{
+		return this->m_idx_frame;
+	}
+
+	IMAGE* getFrame()
+	{
+		return this->m_atlas->getImage(this->m_idx_frame);
+	}
+
+	bool checkFinished()
+	{
+		if (this->is_loop) return false;
+
+		return this->m_idx_frame == this->m_atlas->getSize() - 1;
+	}
+
+	void setCallBack(std::function<void()> callback)
+	{
+		this->m_callback = callback;
+	}
+
+	void on_update(int delta)
+	{
+		this->m_timer += delta;
+		if (this->m_timer >= this->m_interval)
+		{
+			this->m_timer = 0;
+			this->m_idx_frame++;
+			if (this->m_idx_frame >= this->m_atlas->getSize())
+			{
+				this->m_idx_frame = (this->is_loop ? 0 : this->m_atlas->getSize() - 1);
+				if (!this->is_loop && this->m_callback)
+				{
+					this->m_callback();
+				}
+			}
+		}
+	}
+
+	void on_draw(int x, int y) const
+	{
+		putImageAlpha(x, y, this->m_atlas->getImage(this->m_idx_frame));
+	}
+
+private:
+	int m_timer = 0;
+	int m_interval = 0;
+	int m_idx_frame = 0;
+
+	bool is_loop = true;
+
+	Atlas* m_atlas = nullptr;
+
+	std::function<void()> m_callback;
+
+};
+
+#endif
+```
+
+
+
+## 第四节
+
+游戏设计领域有一个很著名的概念叫"3C"，其几乎囊括了大部分游戏设计中最基本的三种元素
