@@ -1,6 +1,7 @@
 #ifndef _SELECTOR_SCENE_H_
 #define _SELECTOR_SCENE_H_
 
+#include "scene.h"
 #include "sceneManager.h"
 
 #include <iostream>

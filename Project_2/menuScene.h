@@ -1,8 +1,11 @@
 #ifndef _MENU_SCENE_H_
 #define _MENU_SCENE_H_
 
+#include "scene.h"
 #include "sceneManager.h"
+
 #include "animation.h"
+#include "camera.h"
 
 #include <iostream>
 
@@ -25,12 +28,14 @@ public:
 
 	virtual void on_update(int delta)
 	{
+		this->m_camera.on_updata(delta);
 		this->m_animation_gamer1_run_right.on_update(delta);
 	}
 
 	virtual void on_draw()
 	{
-		this->m_animation_gamer1_run_right.on_draw(100, 100);
+		const Vector2& pos_camera = this->m_camera.getPosition();
+		this->m_animation_gamer1_run_right.on_draw((int)(100 - pos_camera.m_x), (int)(100 - pos_camera.m_y));
 	}
 
 	virtual void on_input(const ExMessage& msg)
@@ -48,6 +53,7 @@ public:
 
 private:
 	Animation m_animation_gamer1_run_right;
+	Camera m_camera;
 
 };
 

@@ -1,8 +1,11 @@
 #include "atlas.h"
+
+#include "scene.h"
 #include "sceneManager.h"
 #include "menuScene.h"
 #include "gameScene.h"
 #include "selectorScene.h"
+
 #include "utils.h"
 
 #pragma comment(lib, "Winmm.lib")

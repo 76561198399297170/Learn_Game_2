@@ -4,7 +4,6 @@
 #include "atlas.h"
 #include "utils.h"
 
-
 #include <functional>
 
 class Animation

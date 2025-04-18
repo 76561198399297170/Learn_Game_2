@@ -1936,3 +1936,760 @@ virtual void on_draw()
 }
 ```
 
+
+
+以及测试一下动画播放结束的回调函数，对menuScene中类内的on_enter修改，增加设置回调函数且使用lambda匿名函数的方式，运行结果可以正确执行跳转至此测试完毕：
+
+```
+this->m_animation_gamer1_run_right.setLoop(false);
+this->m_animation_gamer1_run_right.setCallBack(
+	[]()
+	{
+		scene_manager.switchTo(SceneManager::SceneType::Game);
+	}
+);
+```
+
+
+
+### Camera核心代码
+
+前面探讨过程中，基本需求可以得知摄像机基本可以等效为一个点，虽然可以直接只有POINT来记录整个点，但是为了使用浮点更精细记录这个点我们需要建立在游戏框架中常见的二维向量类。
+
+首先创建头文件vector2.h文件并定义Vector2类，添加公有成员浮点横纵坐标并编写有参构造方法，随后编写后续可能需要的运算符重载方便后续使用，最后添加两个成员函数获取斜边长度即向量长度与获取向量标准化方法：
+
+```
+#ifndef _VECTOR2_H_
+#define _VECTOR2_H_
+
+#include <cmath>
+
+class Vector2
+{
+public:
+	Vector2() = default;
+	~Vector2() = default;
+
+	Vector2(float x, float y) : m_x(x), m_y(y) {}
+
+	Vector2 operator+(const Vector2& vec)
+	{
+		return Vector2(this->m_x + vec.m_x, this->m_y + vec.m_y);
+	}
+
+	void operator+=(const Vector2& vec)
+	{
+		this->m_x += vec.m_x, this->m_y += vec.m_y;
+	}
+
+	Vector2 operator-(const Vector2& vec)
+	{
+		return Vector2(this->m_x - vec.m_x, this->m_y - vec.m_y);
+	}
+
+	void operator-=(const Vector2& vec)
+	{
+		this->m_x -= vec.m_x, this->m_y -= vec.m_y;
+	}
+
+	float operator*(const Vector2& vec)
+	{
+		return this->m_x * vec.m_x + this->m_y * vec.m_y;
+	}
+
+	Vector2 operator* (const float val) const
+	{
+		return Vector2(this->m_x * val, this->m_y * val);
+	}
+
+	void operator*=(float val)
+	{
+		this->m_x *= val, this->m_y *= val;
+	}
+
+	float length()
+	{
+		return sqrt(pow(this->m_x, 2) + pow(this->m_y, 2));
+	}
+
+	Vector2 normalize()
+	{
+		float len = this->length();
+		if (len == 0) return Vector2(0, 0);
+
+		return Vector2(this->m_x / len, this->m_y / len);
+	}
+
+public:
+	float m_x;
+	float m_y;
+
+};
+
+#endif
+```
+
+
+
+接下来创建camera.h头文件定义Camera摄像机类，并在引入vector2.h头文件后创建私有成员变量m_position以及getPosition方法获取引用常量，提供reset方法使得坐标归零，声明on_updata方法因暂无需要添加的内容让其暂时空置：
+
+```
+#ifndef _CAMERA_H_
+#define _CAMERA_H_
+
+#include "vector2.h"
+
+class Camera
+{
+public:
+	Camera() = default;
+	~Camera() = default;
+
+	void reset()
+	{
+		this->m_position.m_y = this->m_position.m_x = 0;
+	}
+
+	const Vector2& getPosition() const
+	{
+		return this->m_position;
+	}
+
+	void on_updata(int delta)
+	{
+
+	}
+
+private:
+	Vector2 m_position;
+
+};
+
+#endif
+```
+
+
+
+### 摄像头功能测试
+
+来到menuScene.h文件下，为观感更好，取消之前单词播放与回调函数并引入camera.h文件定义私有成员Camera并在on_draw中修改绘制方式，运行可以看到与之前相同的结果：
+
+```
+//头文件引入
+#include "camera.h"
+
+//MenuScene类内成员变量声明
+Camera m_camera;
+
+//修改成员函数on_enter
+virtual void on_enter()
+{
+    this->m_animation_gamer1_run_right.setAtlas(&atlas_gamer1_run_right);
+    this->m_animation_gamer1_run_right.setInterval(75);
+    this->m_animation_gamer1_run_right.setLoop(true);
+}
+
+//修改成员函数on_draw
+virtual void on_draw()
+{
+    const Vector2& pos_camera = this->m_camera.getPosition();
+    this->m_animation_gamer1_run_right.on_draw((int)(100 - pos_camera.m_x), (int)(100 - pos_camera.m_y));
+}
+
+```
+
+
+
+因为此时，摄像头的世界坐标是（0, 0）而渲染的动画坐标在（100, 100）此时做差与原先位置不变，想要确定功能实现的话我们应该尝试让摄像头动起来，首先需要在MenuScene中的on_updata调用Camera的on_updata方法，随后回到camera.h中修改on_updata方法编写如下逻辑再运行程序，可以看到渲染的动画水平向右移动，正是因为摄像头x坐标变小（摄像头向左水平移动）导致的，由此摄像头的基础完成：
+
+```
+void on_updata(int delta)
+{
+	const Vector2 speed = { -0.35f, 0 };
+	this->m_position += speed * (float)delta;
+}
+```
+
+
+
+## 第四节代码完成展示
+
+**main.cpp**
+
+```
+#include "atlas.h"
+
+#include "scene.h"
+#include "sceneManager.h"
+#include "menuScene.h"
+#include "gameScene.h"
+#include "selectorScene.h"
+
+#include "utils.h"
+
+#pragma comment(lib, "Winmm.lib")
+
+#include <graphics.h>
+
+const int FPS = 60;
+
+IMAGE img_menu_background;					//主菜单背景图片
+
+IMAGE img_VS;								//VS 艺术字图片
+IMAGE img_1P;								//1P 文本图片
+IMAGE img_2P;								//2P 文本图片
+IMAGE img_1P_desc;							//1P 键位描述图片
+IMAGE img_2P_desc;							//2P 键位描述图片
+IMAGE img_select_background_left;			//选人朝左背景图片
+IMAGE img_select_background_right;			//选人朝右背景图片
+IMAGE img_selector_tip;						//选人界面提示信息
+IMAGE img_selector_background;				//选人界面背景图
+IMAGE img_1P_selector_btn_idle_left;		//1P 向左选择按钮默认状态图片
+IMAGE img_1P_selector_btn_idle_right;		//1P 向右选择按钮默认状态图片
+IMAGE img_1P_selector_btn_down_left;		//1P 向左选择按钮按下状态图片
+IMAGE img_1P_selector_btn_down_right;		//1P 向右选择按钮按下状态图片
+IMAGE img_2P_selector_btn_idle_left;		//2P 向左选择按钮默认状态图片
+IMAGE img_2P_selector_btn_idle_right;		//2P 向右选择按钮默认状态图片
+IMAGE img_2P_selector_btn_down_left;		//2P 向左选择按钮按下状态图片
+IMAGE img_2P_selector_btn_down_right;		//2P 向右选择按钮按下状态图片
+IMAGE img_gamer1_selector_background_left;	//选人界面类型1朝左背景图片
+IMAGE img_gamer1_selector_background_right;	//选人界面类型1朝右背景图片
+IMAGE img_gamer2_selector_background_left;	//选人界面类型2朝左背景图片
+IMAGE img_gamer2_selector_background_right;	//选人界面类型2朝右背景图片
+
+IMAGE img_sky;								//填空图片
+IMAGE img_hills;							//山脉图片
+IMAGE img_platform_large;					//大型平台图片
+IMAGE img_platform_small;					//小型平台图片
+
+IMAGE img_1P_cursor;						//1P 指示光标图片
+IMAGE img_2P_cursor;						//2P 指示光标图片
+
+Atlas atlas_gamer1_idle_left;				//类型1向左默认动画图集
+Atlas atlas_gamer1_idle_right;				//类型1向右默认动画图集
+Atlas atlas_gamer1_run_left;				//类型1向左奔跑动画图集
+Atlas atlas_gamer1_run_right;				//类型1向右奔跑动画图集
+Atlas atlas_gamer1_attack_ex_left;			//类型1向左特殊攻击动画图集
+Atlas atlas_gamer1_attack_ex_right;			//类型1向右特殊攻击动画图集
+Atlas atlas_gamer1_die_left;				//类型1向左死亡动画图集
+Atlas atlas_gamer1_die_right;				//类型1向右死亡动画图集
+
+Atlas atlas_gamer2_idle_left;				//类型2向左默认动画图集
+Atlas atlas_gamer2_idle_right;				//类型2向右默认动画图集
+Atlas atlas_gamer2_run_left;				//类型2向左奔跑动画图集
+Atlas atlas_gamer2_run_right;				//类型2向右奔跑动画图集
+Atlas atlas_gamer2_attack_ex_left;			//类型2向左特殊攻击动画图集
+Atlas atlas_gamer2_attack_ex_right;			//类型2向右特殊攻击动画图集
+Atlas atlas_gamer2_die_left;				//类型2向左死亡动画图集
+Atlas atlas_gamer2_die_right;				//类型2向右死亡动画图集
+
+IMAGE img_gamer1_bullet;					//类型1子弹图片
+Atlas atlas_gamer1_bullet_break;			//类型1子弹破碎动画图集
+Atlas atlas_gemer2_bullet;					//类型2子弹动画图集
+Atlas atlas_gemer2_bullet_explode;			//类型2子弹爆炸动画图集
+Atlas atlas_gamer2_bullet_ex;				//类型2特殊类型子弹动画图集
+Atlas atlas_gamer2_bullet_ex_explode;		//类型2特殊类型子弹爆炸动画图集
+Atlas atlas_gamer2_bullet_text;				//类型2特殊类型子弹爆炸文本动画图集
+
+Atlas atlas_run_effect;						//奔跑特效动画图集
+Atlas atlas_jump_effect;					//跳跃特效动画图集
+Atlas atlas_land_effect;					//落地特效动画图集
+
+IMAGE img_winner_bar;						//获胜玩家背景图片
+IMAGE img_1P_winner;						//1P 获胜文本图片
+IMAGE img_2P_winner;						//2P 获胜文本图片
+
+IMAGE img_avatar_gamer1;					//类型1头像图片
+IMAGE img_avatar_gamer2;					//类型2头像图片
+
+Scene* menu_scene = nullptr;
+Scene* game_scene = nullptr;
+Scene* selector_scene = nullptr;
+
+SceneManager scene_manager;
+
+void flipAtlas(Atlas& src, Atlas& dst)
+{
+	dst.clear();
+	for (int i = 0; i < src.getSize(); i++)
+	{
+		IMAGE img_flpipped;
+		flipImage(src.getImage(i), &img_flpipped);
+		dst.addImage(img_flpipped);
+	}
+}
+
+void loadGameResources()
+{
+	AddFontResourceEx(L"./resources/HYPixel11pxU-2.ttf", FR_PRIVATE, NULL);
+
+	loadimage(&img_menu_background, L"./resources/menu_background.png");
+	loadimage(&img_1P, L"./resources/1P.png");
+	loadimage(&img_2P, L"./resources/2P.png");
+	loadimage(&img_1P_desc, L"./resources/1P_dest.png");
+	loadimage(&img_2P_desc, L"./resources/2P_dest.png");
+	loadimage(&img_select_background_right, L"./resources/select_background.png");
+	flipImage(&img_select_background_right, &img_select_background_left);
+	loadimage(&img_selector_tip, L"./resources/selector_tip.png");
+	loadimage(&img_selector_background, L"./resoources/selector_background.png");
+	loadimage(&img_1P_selector_btn_idle_right, L"./resources/1P_selector_btn_idle.png");
+	flipImage(&img_1P_selector_btn_idle_right, &img_1P_selector_btn_idle_left);
+	loadimage(&img_1P_selector_btn_down_right, L"./resources/1P_selector_btn_down.png");
+	flipImage(&img_1P_selector_btn_down_right, &img_1P_selector_btn_down_left);
+	loadimage(&img_2P_selector_btn_idle_right, L"./resources/2P_selector_btn_idle.png");
+	flipImage(&img_2P_selector_btn_idle_right, &img_2P_selector_btn_idle_left);
+	loadimage(&img_2P_selector_btn_down_right, L"./resources/2P_selector_btn_down.png");
+	flipImage(&img_2P_selector_btn_down_right, &img_2P_selector_btn_down_left);
+	loadimage(&img_gamer1_selector_background_right, L"./resources/gamer1_selector_background.png");
+	flipImage(&img_gamer1_selector_background_right, &img_gamer1_selector_background_left);
+	loadimage(&img_gamer2_selector_background_right, L"./resources/gamer2_selector_background.png");
+	flipImage(&img_gamer2_selector_background_right, &img_gamer2_selector_background_left);
+
+	loadimage(&img_sky, L"./resources/sky.png");
+	loadimage(&img_hills, L"./resources/hills.png");
+	loadimage(&img_platform_large, L"./resources/platform_large.png");
+	loadimage(&img_platform_small, L"./resources/platform_small.png");
+
+	loadimage(&img_1P_cursor, L"./resources/1P_cursor.png");
+	loadimage(&img_2P_cursor, L"./resources/2P_cursor.png");
+
+	atlas_gamer1_idle_right.loadFromFile(L"./resources/gamer1_idle_%d.png", 9);
+	flipAtlas(atlas_gamer1_idle_right, atlas_gamer1_idle_left);
+	atlas_gamer1_run_right.loadFromFile(L"./resources/gamer1_run_%d.png", 5);
+	flipAtlas(atlas_gamer1_run_right, atlas_gamer1_run_left);
+	atlas_gamer1_attack_ex_right.loadFromFile(L"./resources/gamer1_attack_ex_%d.png", 3);
+	flipAtlas(atlas_gamer1_attack_ex_right, atlas_gamer1_attack_ex_left);
+	atlas_gamer1_die_right.loadFromFile(L"./resources/gamer1_die_%d.png", 4);
+	flipAtlas(atlas_gamer1_die_right, atlas_gamer1_die_left);
+
+	atlas_gamer2_idle_right.loadFromFile(L"./resources/gamer2_idle_%d.png", 8);
+	flipAtlas(atlas_gamer2_idle_right, atlas_gamer2_idle_left);
+	atlas_gamer2_run_right.loadFromFile(L"./resources/gamer2_run_%d.png", 5);
+	flipAtlas(atlas_gamer2_run_right, atlas_gamer2_run_left);
+	atlas_gamer2_attack_ex_right.loadFromFile(L"./resources/gamer2_attack_ex_%d.png", 9);
+	flipAtlas(atlas_gamer2_attack_ex_right, atlas_gamer2_attack_ex_left);
+	atlas_gamer2_die_right.loadFromFile(L"./resources/gamer2_die_%d.png", 2);
+	flipAtlas(atlas_gamer2_die_right, atlas_gamer2_die_left);
+
+	loadimage(&img_gamer1_bullet, L"./resources/gamer_bullet.png");
+	atlas_gamer1_bullet_break.loadFromFile(L"./resources/gamer1_bullet_break_%d.png", 3);
+	atlas_gemer2_bullet.loadFromFile(L"./resources/gamer2_bullet_%d.png", 5);
+	atlas_gemer2_bullet_explode.loadFromFile(L"./resources/gamer2_bullet_explode_%d.png", 5);
+	atlas_gamer2_bullet_ex.loadFromFile(L"./resources/gamer2_bullet_ex_%d.png", 5);
+	atlas_gamer2_bullet_ex_explode.loadFromFile(L"./resources/gamer2_bullet_ex_explode_%d.png", 5);
+	atlas_gamer2_bullet_text.loadFromFile(L"./resources/gamer2_bullet_text_%d.png", 6);
+
+	atlas_run_effect.loadFromFile(L"./resources/run_effect_%d.png", 4);
+	atlas_jump_effect.loadFromFile(L"./resources/jump_effect_%d.png", 5);
+	atlas_land_effect.loadFromFile(L"./resources/land_effect_%d.png", 2);
+
+	loadimage(&img_1P_winner, L"./resources/1P_winner.png");
+	loadimage(&img_2P_winner, L"./resources/2P_winner.png");
+	loadimage(&img_winner_bar, L"./resources/winner_bar.png");
+
+	loadimage(&img_avatar_gamer1, L"./resources/avatar_gamer1.png");
+	loadimage(&img_avatar_gamer2, L"./resources/avatar_gamer2.png");
+
+	mciSendString(L"open ./resources/bgm_game.mp3 alias bgm_game", NULL, 0, NULL);
+	mciSendString(L"open ./resources/bgm_menu.mp3 alias bgm_menu", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer1_bullet_break_1.mp3 alias gamer1_bullet_break_1", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer1_bullet_break_2.mp3 alias gamer1_bullet_break_2", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer1_bullet_break_3.mp3 alias gamer1_bullet_break_3", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer1_bullet_shoot_1.mp3 alias gamer1_bullet_shoot_1", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer1_bullet_shoot_2.mp3 alias gamer1_bullet_shoot_2", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer1_bullet_shoot_ex.mp3 alias gamer1_bullet_shoot_ex", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer2_bullet_explode.mp3 alias gamer2_bullet_explode", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer2_bullet_explode_ex.mp3 alias gamer2_bullet_explode_ex", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer2_bullet_text.mp3 alias gamer2_bullet_text", NULL, 0, NULL);
+	mciSendString(L"open ./resources/ui_confirm.wav alias ui_confirm", NULL, 0, NULL);
+	mciSendString(L"open ./resources/ui_switch.wav alias ui_switch", NULL, 0, NULL);
+	mciSendString(L"open ./resources/ui_win.wav alias ui_win", NULL, 0, NULL);
+
+	return;
+}
+
+int main()
+{
+	ExMessage msg;
+
+	loadGameResources();
+	
+	initgraph(1200, 720);
+
+	menu_scene = new MenuScene();
+	game_scene = new GameScene();
+	selector_scene = new SelectorScene();
+	scene_manager.setCurrentState(menu_scene);
+
+
+	BeginBatchDraw();
+	while (true)
+	{
+		DWORD frame_start_time = GetTickCount();
+
+		while (peekmessage(&msg))
+		{
+			scene_manager.on_input(msg);
+		}
+
+		static DWORD last_tick_time = GetTickCount();
+		DWORD current_tick_time = GetTickCount();
+		DWORD delta_tick_time = current_tick_time - last_tick_time;
+		scene_manager.on_updata(delta_tick_time);
+		last_tick_time = current_tick_time;
+
+		cleardevice();
+		scene_manager.on_draw();
+
+		FlushBatchDraw();
+
+		DWORD frame_end_time = GetTickCount();
+		DWORD frame_delta_time = frame_end_time - frame_start_time;
+		if (frame_delta_time < 1000 / FPS)
+		{
+			Sleep(1000 / FPS - frame_delta_time);
+		}
+
+	}
+	EndBatchDraw();
+
+	return 0;
+}
+```
+
+**scene.h**
+
+```
+#ifndef _SCENE_H_
+#define _SCENE_H_
+
+#include <graphics.h>
+
+class Scene
+{
+public:
+	Scene() = default;
+	~Scene() = default;
+
+	virtual void on_enter() {}
+	virtual void on_update(int delta) {}
+	virtual void on_draw() {}
+	virtual void on_input(const ExMessage& msg) {}
+	virtual void on_exit() {}
+
+private:
+
+};
+
+#endif
+```
+
+**menuScene.h**
+
+```
+#ifndef _MENU_SCENE_H_
+#define _MENU_SCENE_H_
+
+#include "scene.h"
+#include "sceneManager.h"
+
+#include "animation.h"
+#include "camera.h"
+
+#include <iostream>
+
+extern Atlas atlas_gamer1_run_right;
+
+extern SceneManager scene_manager;
+
+class MenuScene : public Scene
+{
+public:
+	MenuScene() = default;
+	~MenuScene() = default;
+
+	virtual void on_enter()
+	{
+		this->m_animation_gamer1_run_right.setAtlas(&atlas_gamer1_run_right);
+		this->m_animation_gamer1_run_right.setInterval(75);
+		this->m_animation_gamer1_run_right.setLoop(true);
+	}
+
+	virtual void on_update(int delta)
+	{
+		this->m_camera.on_updata(delta);
+		this->m_animation_gamer1_run_right.on_update(delta);
+	}
+
+	virtual void on_draw()
+	{
+		const Vector2& pos_camera = this->m_camera.getPosition();
+		this->m_animation_gamer1_run_right.on_draw((int)(100 - pos_camera.m_x), (int)(100 - pos_camera.m_y));
+	}
+
+	virtual void on_input(const ExMessage& msg)
+	{
+		if (msg.message == WM_KEYDOWN)
+		{
+			scene_manager.switchTo(SceneManager::SceneType::Selector);
+		}
+	}
+
+	virtual void on_exit()
+	{
+		std::cout << "主菜单退出！" << std::endl;
+	}
+
+private:
+	Animation m_animation_gamer1_run_right;
+	Camera m_camera;
+
+};
+
+#endif
+```
+
+**selectorScene.h**
+
+```
+#ifndef _SELECTOR_SCENE_H_
+#define _SELECTOR_SCENE_H_
+
+#include "scene.h"
+#include "sceneManager.h"
+
+#include <iostream>
+
+extern SceneManager scene_manager;
+
+class SelectorScene : public Scene
+{
+public:
+	SelectorScene() = default;
+	~SelectorScene() = default;
+
+	virtual void on_enter()
+	{
+		std::cout << "进入选人！" << std::endl;
+	}
+
+	virtual void on_update(int delta)
+	{
+		std::cout << "选人运行中..." << std::endl;
+	}
+
+	virtual void on_draw()
+	{
+		outtextxy(10, 10, L"选人绘制");
+	}
+
+	virtual void on_input(const ExMessage& msg)
+	{
+		if (msg.message == WM_KEYDOWN)
+		{
+			scene_manager.switchTo(SceneManager::SceneType::Game);
+		}
+	}
+
+	virtual void on_exit()
+	{
+		std::cout << "选人退出！" << std::endl;
+	}
+
+private:
+
+};
+
+#endif
+```
+
+**gameScene.h**
+
+```
+#ifndef _GAME_SCENE_H_
+#define _GAME_SCENE_H_
+
+#include "scene.h"
+#include "sceneManager.h"
+
+#include <iostream>
+
+extern SceneManager scene_manager;
+
+class GameScene : public Scene
+{
+public:
+	GameScene() = default;
+	~GameScene() = default;
+
+	virtual void on_enter()
+	{
+		std::cout << "进入游戏局内场景！" << std::endl;
+	}
+
+	virtual void on_update(int delta)
+	{
+		std::cout << "游戏运行中..." << std::endl;
+	}
+
+	virtual void on_draw()
+	{
+		outtextxy(10, 10, L"游戏局内绘制");
+	}
+
+	virtual void on_input(const ExMessage& msg)
+	{
+		if (msg.message == WM_KEYDOWN)
+		{
+			scene_manager.switchTo(SceneManager::SceneType::Menu);
+		}
+	}
+
+	virtual void on_exit()
+	{
+		std::cout << "游戏局内退出！" << std::endl;
+	}
+
+private:
+
+};
+
+#endif
+```
+
+**vector2.h**
+
+```
+#ifndef _VECTOR2_H_
+#define _VECTOR2_H_
+
+#include <cmath>
+
+class Vector2
+{
+public:
+	Vector2() = default;
+	~Vector2() = default;
+
+	Vector2(float x, float y) : m_x(x), m_y(y) {}
+
+	Vector2 operator+(const Vector2& vec)
+	{
+		return Vector2(this->m_x + vec.m_x, this->m_y + vec.m_y);
+	}
+
+	void operator+=(const Vector2& vec)
+	{
+		this->m_x += vec.m_x, this->m_y += vec.m_y;
+	}
+
+	Vector2 operator-(const Vector2& vec)
+	{
+		return Vector2(this->m_x - vec.m_x, this->m_y - vec.m_y);
+	}
+
+	void operator-=(const Vector2& vec)
+	{
+		this->m_x -= vec.m_x, this->m_y -= vec.m_y;
+	}
+
+	float operator*(const Vector2& vec)
+	{
+		return this->m_x * vec.m_x + this->m_y * vec.m_y;
+	}
+
+	Vector2 operator*(const float val) const
+	{
+		return Vector2(this->m_x * val, this->m_y * val);
+	}
+
+	void operator*=(float val)
+	{
+		this->m_x *= val, this->m_y *= val;
+	}
+
+	float length()
+	{
+		return sqrt(pow(this->m_x, 2) + pow(this->m_y, 2));
+	}
+
+	Vector2 normalize()
+	{
+		float len = this->length();
+		if (len == 0) return Vector2(0, 0);
+
+		return Vector2(this->m_x / len, this->m_y / len);
+	}
+
+public:
+	float m_x;
+	float m_y;
+
+};
+
+#endif
+```
+
+**camera.h**
+
+```
+#ifndef _CAMERA_H_
+#define _CAMERA_H_
+
+#include "vector2.h"
+
+class Camera
+{
+public:
+	Camera() = default;
+	~Camera() = default;
+
+	void reset()
+	{
+		this->m_position.m_y = this->m_position.m_x = 0;
+	}
+
+	const Vector2& getPosition() const
+	{
+		return this->m_position;
+	}
+
+	void on_updata(int delta)
+	{
+		const Vector2 speed = { -0.35f, 0 };
+		this->m_position += speed * (float)delta;
+	}
+
+private:
+	Vector2 m_position;
+
+};
+
+#endif
+```
+
+
+
+## 第五节
+
+### 抖动效果引入
+
+游戏的画面不一定是素材的累积，很多时候质感有也可以通过一些小技巧快速提升，这一节将在之前Camera基础上实现摄像机抖动的效果，很多时候开发者会选择让屏幕以不同幅度的抖动来透过屏幕表现打击的力量感，可以说这是一种实现起来相对廉价的但表现不错的视觉特效。
+
+### 计时器概念
+
+摄像机的抖动特效作为玩家画面的一个限时状态，必然要在开始的一段时间后结束这种效果，所以和之前的播控相似，也需要一个定时器来控制特效的开始与结束时刻，并且从长远的角度看，技能CD或无敌帧等等效果都需要时间相关的功能，所以不如先封装一个通用定时器来对这些有时效性的功能提供相对统一的管理模式。
+
+关于实现部分还是需要考虑其设计思想的，这里有两种定时器设计思路，一是继承二回调；
+
+  **·**  继承在on_updata中指向定时器时间到达时的逻辑，这部分逻辑封装在callback成员方法中，如果想要实现自己的定时器就要实现自己的定时器逻辑，那么只需让自己的定时器集成自Timer基类并重写callback方法，在使用时通过多态便能执行重写后的定时器逻辑。
+
+  **·**  回调与继承的逻辑相似，通过setCallback成员方法，讲回调函数保存在对象内部并在合适时进行调用，使用时只需向对象注册自己的回调函数即可。
+
+对比两种定时器实现方式，明显实现回调函数的定时器在代码编写上更为简洁，如果需要不同逻辑的定时器，在继承的方法上就需要编写很多不同的计时器子类，而回调的方法中只需要实例化计时器并编写一个lambda函数即可。
+
+而从代码设计的思路，像通用计时器这类只需要扩展回调方法逻辑而无需扩展数据成员内容的类，我们会更倾向于使用回调函数思路而非使用类的继承，在代码编写起来更加轻松，并且语义上会更加明确。
+
+### 计时器类实现
+
+创建文件Timer.h头文件创建Timer类
