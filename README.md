@@ -1241,12 +1241,12 @@ void loadGameResources()
 	loadimage(&img_menu_background, L"./resources/menu_background.png");
 	loadimage(&img_1P, L"./resources/1P.png");
 	loadimage(&img_2P, L"./resources/2P.png");
-	loadimage(&img_1P_desc, L"./resources/1P_dest.png");
-	loadimage(&img_2P_desc, L"./resources/2P_dest.png");
+	loadimage(&img_1P_desc, L"./resources/1P_desc.png");
+	loadimage(&img_2P_desc, L"./resources/2P_desc.png");
 	loadimage(&img_select_background_right, L"./resources/select_background.png");
 	flipImage(&img_select_background_right, &img_select_background_left);
 	loadimage(&img_selector_tip, L"./resources/selector_tip.png");
-	loadimage(&img_selector_background, L"./resoources/selector_background.png");
+	loadimage(&img_selector_background, L"./resources/selector_background.png");
 	loadimage(&img_1P_selector_btn_idle_right, L"./resources/1P_selector_btn_idle.png");
 	flipImage(&img_1P_selector_btn_idle_right, &img_1P_selector_btn_idle_left);
 	loadimage(&img_1P_selector_btn_down_right, L"./resources/1P_selector_btn_down.png");
@@ -1581,12 +1581,12 @@ void loadGameResources()
 	loadimage(&img_menu_background, L"./resources/menu_background.png");
 	loadimage(&img_1P, L"./resources/1P.png");
 	loadimage(&img_2P, L"./resources/2P.png");
-	loadimage(&img_1P_desc, L"./resources/1P_dest.png");
-	loadimage(&img_2P_desc, L"./resources/2P_dest.png");
+	loadimage(&img_1P_desc, L"./resources/1P_desc.png");
+	loadimage(&img_2P_desc, L"./resources/2P_desc.png");
 	loadimage(&img_select_background_right, L"./resources/select_background.png");
 	flipImage(&img_select_background_right, &img_select_background_left);
 	loadimage(&img_selector_tip, L"./resources/selector_tip.png");
-	loadimage(&img_selector_background, L"./resoources/selector_background.png");
+	loadimage(&img_selector_background, L"./resources/selector_background.png");
 	loadimage(&img_1P_selector_btn_idle_right, L"./resources/1P_selector_btn_idle.png");
 	flipImage(&img_1P_selector_btn_idle_right, &img_1P_selector_btn_idle_left);
 	loadimage(&img_1P_selector_btn_down_right, L"./resources/1P_selector_btn_down.png");
@@ -2226,12 +2226,12 @@ void loadGameResources()
 	loadimage(&img_menu_background, L"./resources/menu_background.png");
 	loadimage(&img_1P, L"./resources/1P.png");
 	loadimage(&img_2P, L"./resources/2P.png");
-	loadimage(&img_1P_desc, L"./resources/1P_dest.png");
-	loadimage(&img_2P_desc, L"./resources/2P_dest.png");
+	loadimage(&img_1P_desc, L"./resources/1P_desc.png");
+	loadimage(&img_2P_desc, L"./resources/2P_desc.png");
 	loadimage(&img_select_background_right, L"./resources/select_background.png");
 	flipImage(&img_select_background_right, &img_select_background_left);
 	loadimage(&img_selector_tip, L"./resources/selector_tip.png");
-	loadimage(&img_selector_background, L"./resoources/selector_background.png");
+	loadimage(&img_selector_background, L"./resources/selector_background.png");
 	loadimage(&img_1P_selector_btn_idle_right, L"./resources/1P_selector_btn_idle.png");
 	flipImage(&img_1P_selector_btn_idle_right, &img_1P_selector_btn_idle_left);
 	loadimage(&img_1P_selector_btn_down_right, L"./resources/1P_selector_btn_down.png");
@@ -3063,6 +3063,590 @@ private:
 	bool is_shotted = false;//是否触发
 	bool is_one_shot = false;//是否单次触发
 	std::function<void()> m_callback;//回调函数
+
+};
+
+#endif
+```
+
+
+
+## 第六节
+
+### 摄像机实例化与使用
+
+接下来我们需要思考一个渲染相关的问题，前完成了摄像机相关的部分内容，接下来我们需要考虑控制游戏的“主摄像机”对象应该声明在何处？正如之前测试时的动画渲染效果我们需要确保每一个场景在执行渲染时都可以获取到摄像机对象从而根据位置进行实际画面渲染。
+
+思路一是定义在场景内部作为场景内成员对象使用，但是不同场景间的摄像机数据就很难进行共享了。
+
+思路二是定义为全局变量和图片资源一样使用extern关键字获取，但全局变量终归是不美观，在项目编写时我们使用面向对象思想一步步对数据进行封装，其中一个很重要的思想就是尽可能去减少全局变量的使用。
+
+那么我们还能使用哪种设计呢，在on_updata时我们使用传参的方法将delta传入，我们也可以将Camera作为参数在对象渲染时通过参数传递使用，只不过这就需要我们再次重构代码了。
+
+首先是scene.h中为on_draw添加参数const Camera& camera，并将其子类对应修改相应重写函数：
+
+```
+//scene.h文件添加头文件
+#include "camera.h"
+
+//scene.h文件Scene类重写on_draw方法
+virtual void on_draw(const Camera& camera) {}
+
+//menuScene.h文件类重写on_draw方法
+virtual void on_draw(const Camera& camera)
+
+//selectorScene.h文件类重写on_draw方法
+virtual void on_draw(const Camera& camera)
+
+//gameScene.h文件类重写on_draw方法
+virtual void on_draw(const Camera& camera)
+```
+
+
+
+既然所有场景我们都可以通过参数传递获取到摄像机，那么我们就需要再场景管理器绘图阶段将使用的摄像机传入当前场景，也就是修改SceneManager中的on_draw方法修改，随后将main.cpp全局区声明摄像机并在主循环内渲染阶段将摄像机对象传递给场景管理器：
+
+```
+//sceneManager.h修改成员函数
+void on_draw(const Camera& camera)
+{
+	this->m_current_scene->on_draw(camera);
+}
+
+//main.cpp全局变量
+#include "camera.h"
+Camera main_camera;
+
+//main.cpp渲染部分修改
+scene_manager.on_draw(main_camera);
+
+```
+
+
+
+虽然摄像机已经继承到框架中了，但是似乎还是没有避免使用全局变量？虽然在渲染方法的调用过程中只使用了摄像机的位置数据，但摄像机的其他功能例如抖动效果依旧需要编写到渲染方法外，也就是说由于我们没有提供在运行时动态检索游戏对象的设计，所以依然保有部分全局变量也是无奈之举。
+
+不过随着项目的深入，在使用GameObject将整个项目大统一时，我们项目的整个设计将会更加优雅。
+
+
+
+### 菜单场景编写
+
+接下来逐步填充各个场景，首先是菜单场景，先前为测试编写了很多无关的代码，首先就需要清空这些代码，将MenuScene类，SelectorScene类，GameScene类的成员变量与on相关方法内部代码清空例如下：
+
+```
+#ifndef _MENU_SCENE_H_
+#define _MENU_SCENE_H_
+
+#include "scene.h"
+
+class MenuScene : public Scene
+{
+public:
+	MenuScene() = default;
+	~MenuScene() = default;
+
+	virtual void on_enter()
+	{
+	}
+
+	virtual void on_update(int delta)
+	{
+	}
+
+	virtual void on_draw(const Camera& camera)
+	{
+	}
+
+	virtual void on_input(const ExMessage& msg)
+	{
+	}
+
+	virtual void on_exit()
+	{
+	}
+
+private:
+
+};
+
+#endif
+```
+
+
+
+随后我们开始填充MenuScene代码，首先使用extern关键字引入主菜单场景所需的背景资源，随后编写on_draw中使用putimage方法将背景渲染到窗口中，不过为了确保多态接口的一致性on_draw参数不必进行修改，并在on_enter方法中播放背景音乐，最后在on_input中编写按下任意键跳转场景的逻辑：
+
+```
+//全局区声明资源
+#include "sceneManager.h"
+
+extern SceneManager scene_manager;
+extern IMAGE img_menu_background;
+
+//成员函数on_draw方法
+putimage(0, 0, &img_menu_background);
+
+//成员函数on_enter方法
+mciSendString(L"play bgm_menu repeat from 0", NULL, 0, NULL);
+
+//成员函数ono_input方法
+if (msg.message == WM_KEYUP)
+{
+    mciSendString(L"play ui_confirm repeat from 0", NULL, 0, NULL);
+	scene_manager.switchTo(SceneManager::SceneType::Selector);
+}
+```
+
+
+
+### 选角场景编写
+
+接下来开始编写角色选择界面的逻辑，首先引入atlas.h头文件并使用extern声明所需图集与图片资源，为了将资源渲染在正确位置，我们在类内定义一系列POINT类型变量并在on_enter进行初始化，这里并未是直接使用屏幕宽高而是表达式的方法就是为了调整起来方便，并且含义更加明确，对于界面中各类元素位置描述有一套居中外边距等属性的布局框架，在实现该部分内容会更为轻松，但布局框架同样是一个讨论起来费事费力且内容极多的部分，由于本项目只有小部分涉及界面布局若深入讨论布局框架则会耽误太多与主线任务无关的时间，在前面底层搭建阶段已经开辟足够多分枝了所以这种基于布局框架的界面元素定位暂时则不深入讨论。
+
+注意在EasyX中，我们可以使用getwidth与getheight方法获取绘图窗口的宽度和高度，图片类内也提供了获取图片尺寸宽高的方法，由于图片渲染时描述图片位置坐标为图片矩形左上角，如果想让图片在窗口居中则需要在水平与竖直方向上将窗口尺寸和图片尺寸作差并除以二即可，on_enter初始化完成后就可以来到on_draw方法内部将图片内容渲染到对应位置上。
+
+运行程序，正确进行了界面渲染则完成：
+
+```
+//全局区声明资源
+#include "utils.h"
+
+#include "sceneManager.h"
+
+#include "animation.h"
+
+extern IMAGE img_VS;
+extern IMAGE img_1P;
+extern IMAGE img_2P;
+extern IMAGE img_1P_desc;
+extern IMAGE img_2P_desc;
+extern IMAGE img_select_background_left;
+extern IMAGE img_select_background_right;
+extern IMAGE img_selector_tip;
+extern IMAGE img_selector_background;
+extern IMAGE img_1P_selector_btn_idle_left;
+extern IMAGE img_1P_selector_btn_idle_right;
+extern IMAGE img_1P_selector_btn_down_left;
+extern IMAGE img_1P_selector_btn_down_right;
+extern IMAGE img_2P_selector_btn_idle_left;
+extern IMAGE img_2P_selector_btn_idle_right;
+extern IMAGE img_2P_selector_btn_down_left;
+extern IMAGE img_2P_selector_btn_down_right;
+extern IMAGE img_gamer1_selector_background_left;
+extern IMAGE img_gamer1_selector_background_right;
+extern IMAGE img_gamer2_selector_background_left;
+extern IMAGE img_gamer2_selector_background_right;
+
+extern Atlas atlas_gamer1_idle_right;
+extern Atlas atlas_gamer2_idle_right;
+
+extern IMAGE img_avatar_gamer1;
+extern IMAGE img_avatar_gamer2;
+
+extern SceneManager scene_manager;
+
+//SelectorScene私有成员变量
+POINT pos_img_VS = { 0 };
+POINT pos_img_tip = { 0 };
+POINT pos_img_1P = { 0 };
+POINT pos_img_2P = { 0 };
+POINT pos_img_1P_desc = { 0 };
+POINT pos_img_2P_desc = { 0 };
+POINT pos_img_1P_name = { 0 };
+POINT pos_img_2P_name = { 0 };
+POINT pos_animation_1P = { 0 };
+POINT pos_animation_2P = { 0 };
+POINT pos_img_1P_select_background = { 0 };
+POINT pos_img_2P_select_background = { 0 };
+POINT pos_1P_selector_btn_left = { 0 };
+POINT pos_2P_selector_btn_left = { 0 };
+POINT pos_1P_selector_btn_right = { 0 };
+POINT pos_2P_selector_btn_right = { 0 };
+
+Animation m_animation_gamer1;
+Animation m_animation_gamer2;
+
+//编写on_enter方法初始化
+this->m_animation_gamer1.setAtlas(&atlas_gamer1_die_right);
+this->m_animation_gamer2.setAtlas(&atlas_gamer2_idle_right);
+this->m_animation_gamer1.setInterval(100);
+this->m_animation_gamer2.setInterval(100);
+
+static const int OFFSET_X = 50;
+
+this->pos_img_VS.x = (getwidth() - img_VS.getwidth()) / 2;
+this->pos_img_VS.y = (getheight() - img_VS.getheight()) / 2;
+this->pos_img_tip.x = (getwidth() - img_selector_tip.getwidth()) / 2;
+this->pos_img_tip.y = getheight() - 125;
+this->pos_img_1P.x = (getwidth() / 2 - img_1P.getwidth()) / 2 - OFFSET_X;
+this->pos_img_1P.y = 35;
+this->pos_img_2P.x = getwidth() / 2 + (getwidth() / 2 - img_2P.getwidth()) / 2 + OFFSET_X;
+this->pos_img_2P.y = this->pos_img_1P.y;
+this->pos_img_1P_desc.x = (getwidth() - img_1P_desc.getwidth()) / 2 - OFFSET_X;
+this->pos_img_1P_desc.y = getheight() - 150;
+this->pos_img_2P_desc.x = getwidth() / 2 + (getwidth() / 2 - img_2P_desc.getwidth()) / 2 + OFFSET_X;
+this->pos_img_2P_desc.y = this->pos_img_1P_desc.y;
+this->pos_img_1P_select_background.x = (getwidth() / 2 - img_select_background_right.getwidth()) / 2 - OFFSET_X;
+this->pos_img_1P_select_background.y = this->pos_img_1P.y + img_1P.getwidth() + 35;
+this->pos_img_1P_select_background.x = getwidth() / 2 + (getwidth() / 2 - img_select_background_left.getwidth()) / 2 + OFFSET_X;
+this->pos_img_1P_select_background.y = this->pos_img_1P_select_background.y;
+this->pos_animation_1P.x = (getwidth() / 2 - atlas_gamer1_idle_right.getImage(0)->getwidth()) / 2 - OFFSET_X;
+this->pos_animation_1P.y = this->pos_img_1P_select_background.y + 80;
+this->pos_animation_2P.x = getwidth() / 2 + (getwidth() / 2 - atlas_gamer1_idle_right.getImage(0)->getwidth()) / 2 + OFFSET_X;
+this->pos_animation_2P.y = this->pos_animation_1P.y;
+this->pos_img_1P_name.y = this->pos_animation_1P.y + 155;
+this->pos_img_2P_name.y = this->pos_img_1P_name.y;
+this->pos_1P_selector_btn_left.x = this->pos_img_1P_select_background.x - img_1P_selector_btn_idle_left.getwidth();
+this->pos_1P_selector_btn_left.y = this->pos_img_1P_select_background.y + (img_select_background_right.getheight() - img_1P_selector_btn_idle_left.getheight()) / 2;
+this->pos_1P_selector_btn_right.x = this->pos_img_1P_select_background.x + img_select_background_right.getwidth();
+this->pos_1P_selector_btn_right.y = this->pos_1P_selector_btn_left.y;
+this->pos_2P_selector_btn_left.x = this->pos_img_2P_select_background.x + img_2P_selector_btn_idle_left.getwidth();
+this->pos_2P_selector_btn_left.y = this->pos_1P_selector_btn_left.y;
+this->pos_2P_selector_btn_right.x = this->pos_img_2P_select_background.x + img_select_background_left.getwidth();
+this->pos_2P_selector_btn_right.y = this->pos_1P_selector_btn_left.y;
+
+//编写on_draw方法渲染
+putimage(0, 0, &img_selector_background);
+putImageAlpha(this->pos_img_VS.x, this->pos_img_VS.y, &img_VS);
+
+putImageAlpha(this->pos_img_1P.x, this->pos_img_1P.y, &img_1P);
+putImageAlpha(this->pos_img_2P.x, this->pos_img_2P.y, &img_2P);
+putImageAlpha(this->pos_img_1P_select_background.x, this->pos_img_1P_select_background.y, &img_select_background_right);
+putImageAlpha(this->pos_img_2P_select_background.x, this->pos_img_2P_select_background.y, &img_select_background_left);
+
+putImageAlpha(this->pos_img_1P_desc.x, this->pos_img_1P_desc.y, &img_1P_desc);
+putImageAlpha(this->pos_img_2P_desc.x, this->pos_img_2P_desc.y, &img_2P_desc);
+
+putImageAlpha(this->pos_img_tip.x, this->pos_img_tip.y, &img_selector_tip);
+```
+
+
+
+## 第六节代码完成展示
+
+**sceneManager.h**
+
+```
+#ifndef _SCENE_MANAGER_H_
+#define _SCENE_MANAGER_H_
+
+#include "scene.h"
+
+extern Scene* menu_scene;
+extern Scene* game_scene;
+extern Scene* selector_scene;
+
+class SceneManager
+{
+public:
+	enum class SceneType
+	{
+		Menu,
+		Game,
+		Selector
+	};
+
+public:
+	SceneManager() = default;
+	~SceneManager() = default;
+
+	void setCurrentState(Scene* scene)
+	{
+		this->m_current_scene = scene;
+		this->m_current_scene->on_enter();
+	}
+
+	void switchTo(SceneType type)
+	{
+		this->m_current_scene->on_exit();
+		switch (type)
+		{
+		case SceneManager::SceneType::Menu:
+			this->m_current_scene = menu_scene;
+			break;
+		case SceneManager::SceneType::Game:
+			this->m_current_scene = game_scene;
+			break;
+		case SceneManager::SceneType::Selector:
+			this->m_current_scene = selector_scene;
+			break;
+		default:
+			break;
+		}
+		this->m_current_scene->on_enter();
+	}
+
+	void on_updata(int delta)
+	{
+		this->m_current_scene->on_update(delta);
+	}
+
+	void on_draw(const Camera& camera)
+	{
+		this->m_current_scene->on_draw(camera);
+	}
+
+	void on_input(const ExMessage& msg)
+	{
+		this->m_current_scene->on_input(msg);
+	}
+
+public:
+	Scene* m_current_scene = nullptr;
+
+};
+
+#endif
+```
+
+**gameScene.h**
+
+```
+#ifndef _GAME_SCENE_H_
+#define _GAME_SCENE_H_
+
+#include "scene.h"
+#include "sceneManager.h"
+
+#include <iostream>
+
+extern SceneManager scene_manager;
+
+class GameScene : public Scene
+{
+public:
+	GameScene() = default;
+	~GameScene() = default;
+
+	virtual void on_enter() {}
+
+	virtual void on_update(int delta) {}
+
+	virtual void on_draw(const Camera& camera) {}
+
+	virtual void on_input(const ExMessage& msg) {}
+
+	virtual void on_exit() {}
+
+private:
+
+};
+
+#endif
+```
+
+**menuScene.h**
+
+```
+#ifndef _MENU_SCENE_H_
+#define _MENU_SCENE_H_
+
+#include "scene.h"
+#include "sceneManager.h"
+
+extern SceneManager scene_manager;
+
+extern IMAGE img_menu_background;
+
+class MenuScene : public Scene
+{
+public:
+	MenuScene() = default;
+	~MenuScene() = default;
+
+	virtual void on_enter()
+	{
+		mciSendString(L"play bgm_menu repeat from 0", NULL, 0, NULL);
+	}
+
+	virtual void on_update(int delta) {}
+
+	virtual void on_draw(const Camera& camera)
+	{
+		putimage(0, 0, &img_menu_background);
+	}
+
+	virtual void on_input(const ExMessage& msg)
+	{
+		if (msg.message == WM_KEYUP)
+		{
+			mciSendString(L"play ui_confirm repeat from 0", NULL, 0, NULL);
+			scene_manager.switchTo(SceneManager::SceneType::Selector);
+		}
+	}
+
+	virtual void on_exit() {}
+
+private:
+
+};
+
+#endif
+
+```
+
+**scene.h**
+
+```
+#ifndef _SCENE_H_
+#define _SCENE_H_
+
+#include "camera.h"
+
+#include <graphics.h>
+
+class Scene
+{
+public:
+	Scene() = default;
+	~Scene() = default;
+
+	virtual void on_enter() {}
+	virtual void on_update(int delta) {}
+	virtual void on_draw(const Camera& camera) {}
+	virtual void on_input(const ExMessage& msg) {}
+	virtual void on_exit() {}
+
+private:
+
+};
+
+#endif
+```
+
+**selectorScene.h**
+
+```
+#ifndef _SELECTOR_SCENE_H_
+#define _SELECTOR_SCENE_H_
+
+#include "utils.h"
+
+#include "scene.h"
+#include "sceneManager.h"
+
+#include "animation.h"
+
+extern IMAGE img_VS;
+extern IMAGE img_1P;
+extern IMAGE img_2P;
+extern IMAGE img_1P_desc;
+extern IMAGE img_2P_desc;
+extern IMAGE img_select_background_left;
+extern IMAGE img_select_background_right;
+extern IMAGE img_selector_tip;
+extern IMAGE img_selector_background;
+extern IMAGE img_1P_selector_btn_idle_left;
+extern IMAGE img_1P_selector_btn_idle_right;
+extern IMAGE img_1P_selector_btn_down_left;
+extern IMAGE img_1P_selector_btn_down_right;
+extern IMAGE img_2P_selector_btn_idle_left;
+extern IMAGE img_2P_selector_btn_idle_right;
+extern IMAGE img_2P_selector_btn_down_left;
+extern IMAGE img_2P_selector_btn_down_right;
+extern IMAGE img_gamer1_selector_background_left;
+extern IMAGE img_gamer1_selector_background_right;
+extern IMAGE img_gamer2_selector_background_left;
+extern IMAGE img_gamer2_selector_background_right;
+
+extern Atlas atlas_gamer1_idle_right;
+extern Atlas atlas_gamer2_idle_right;
+
+extern IMAGE img_avatar_gamer1;
+extern IMAGE img_avatar_gamer2;
+
+extern SceneManager scene_manager;
+
+class SelectorScene : public Scene
+{
+public:
+	SelectorScene() = default;
+	~SelectorScene() = default;
+
+	virtual void on_enter() 
+	{
+		this->m_animation_gamer1.setAtlas(&atlas_gamer1_idle_right);
+		this->m_animation_gamer2.setAtlas(&atlas_gamer2_idle_right);
+		this->m_animation_gamer1.setInterval(100);
+		this->m_animation_gamer2.setInterval(100);
+
+		static const int OFFSET_X = 50;
+
+		this->pos_img_VS.x = (getwidth() - img_VS.getwidth()) / 2;
+		this->pos_img_VS.y = (getheight() - img_VS.getheight()) / 2;
+		this->pos_img_tip.x = (getwidth() - img_selector_tip.getwidth()) / 2;
+		this->pos_img_tip.y = getheight() - 125;
+		this->pos_img_1P.x = (getwidth() / 2 - img_1P.getwidth()) / 2 - OFFSET_X;
+		this->pos_img_1P.y = 35;
+		this->pos_img_2P.x = getwidth() / 2 + (getwidth() / 2 - img_2P.getwidth()) / 2 + OFFSET_X;
+		this->pos_img_2P.y = this->pos_img_1P.y;
+		this->pos_img_1P_desc.x = (getwidth() / 2 - img_1P_desc.getwidth()) / 2 - OFFSET_X;
+		this->pos_img_1P_desc.y = getheight() - 150;
+		this->pos_img_2P_desc.x = getwidth() / 2 + (getwidth() / 2 - img_2P_desc.getwidth()) / 2 + OFFSET_X;
+		this->pos_img_2P_desc.y = this->pos_img_1P_desc.y;
+		this->pos_img_1P_select_background.x = (getwidth() / 2 - img_select_background_right.getwidth()) / 2 - OFFSET_X;
+		this->pos_img_1P_select_background.y = this->pos_img_1P.y + img_1P.getwidth() + 35;
+		this->pos_img_2P_select_background.x = getwidth() / 2 + (getwidth() / 2 - img_select_background_left.getwidth()) / 2 + OFFSET_X;
+		this->pos_img_2P_select_background.y = this->pos_img_1P_select_background.y;
+		this->pos_animation_1P.x = (getwidth() / 2 - atlas_gamer1_idle_right.getImage(0)->getwidth()) / 2 - OFFSET_X;
+		this->pos_animation_1P.y = this->pos_img_1P_select_background.y + 80;
+		this->pos_animation_2P.x = getwidth() / 2 + (getwidth() / 2 - atlas_gamer1_idle_right.getImage(0)->getwidth()) / 2 + OFFSET_X;
+		this->pos_animation_2P.y = this->pos_animation_1P.y;
+		this->pos_img_1P_name.y = this->pos_animation_1P.y + 155;
+		this->pos_img_2P_name.y = this->pos_img_1P_name.y;
+		this->pos_1P_selector_btn_left.x = this->pos_img_1P_select_background.x - img_1P_selector_btn_idle_left.getwidth();
+		this->pos_1P_selector_btn_left.y = this->pos_img_1P_select_background.y + (img_select_background_right.getheight() - img_1P_selector_btn_idle_left.getheight()) / 2;
+		this->pos_1P_selector_btn_right.x = this->pos_img_1P_select_background.x + img_select_background_right.getwidth();
+		this->pos_1P_selector_btn_right.y = this->pos_1P_selector_btn_left.y;
+		this->pos_2P_selector_btn_left.x = this->pos_img_2P_select_background.x + img_2P_selector_btn_idle_left.getwidth();
+		this->pos_2P_selector_btn_left.y = this->pos_1P_selector_btn_left.y;
+		this->pos_2P_selector_btn_right.x = this->pos_img_2P_select_background.x + img_select_background_left.getwidth();
+		this->pos_2P_selector_btn_right.y = this->pos_1P_selector_btn_left.y;
+	}
+
+	virtual void on_update(int delta) {}
+
+	virtual void on_draw(const Camera& camera)
+	{
+		putimage(0, 0, &img_selector_background);
+		putImageAlpha(this->pos_img_VS.x, this->pos_img_VS.y, &img_VS);
+
+		putImageAlpha(this->pos_img_1P.x, this->pos_img_1P.y, &img_1P);
+		putImageAlpha(this->pos_img_2P.x, this->pos_img_2P.y, &img_2P);
+		putImageAlpha(this->pos_img_1P_select_background.x, this->pos_img_1P_select_background.y, &img_select_background_right);
+		putImageAlpha(this->pos_img_2P_select_background.x, this->pos_img_2P_select_background.y, &img_select_background_left);
+
+		putImageAlpha(this->pos_img_1P_desc.x, this->pos_img_1P_desc.y, &img_1P_desc);
+		putImageAlpha(this->pos_img_2P_desc.x, this->pos_img_2P_desc.y, &img_2P_desc);
+
+		putImageAlpha(this->pos_img_tip.x, this->pos_img_tip.y, &img_selector_tip);
+	}
+
+	virtual void on_input(const ExMessage& msg) {}
+
+	virtual void on_exit() {}
+
+private:
+	POINT pos_img_VS = { 0 };
+	POINT pos_img_tip = { 0 };
+	POINT pos_img_1P = { 0 };
+	POINT pos_img_2P = { 0 };
+	POINT pos_img_1P_desc = { 0 };
+	POINT pos_img_2P_desc = { 0 };
+	POINT pos_img_1P_name = { 0 };
+	POINT pos_img_2P_name = { 0 };
+	POINT pos_animation_1P = { 0 };
+	POINT pos_animation_2P = { 0 };
+	POINT pos_img_1P_select_background = { 0 };
+	POINT pos_img_2P_select_background = { 0 };
+	POINT pos_1P_selector_btn_left = { 0 };
+	POINT pos_2P_selector_btn_left = { 0 };
+	POINT pos_1P_selector_btn_right = { 0 };
+	POINT pos_2P_selector_btn_right = { 0 };
+
+	Animation m_animation_gamer1;
+	Animation m_animation_gamer2;
 
 };
 

@@ -1,4 +1,5 @@
 #include "atlas.h"
+#include "camera.h"
 
 #include "scene.h"
 #include "sceneManager.h"
@@ -13,6 +14,8 @@
 #include <graphics.h>
 
 const int FPS = 60;
+
+Camera main_camera;
 
 IMAGE img_menu_background;					//Ö÷²Ëµ¥±³¾°Í¼Æ¬
 
@@ -107,12 +110,12 @@ void loadGameResources()
 	loadimage(&img_menu_background, L"./resources/menu_background.png");
 	loadimage(&img_1P, L"./resources/1P.png");
 	loadimage(&img_2P, L"./resources/2P.png");
-	loadimage(&img_1P_desc, L"./resources/1P_dest.png");
-	loadimage(&img_2P_desc, L"./resources/2P_dest.png");
+	loadimage(&img_1P_desc, L"./resources/1P_desc.png");
+	loadimage(&img_2P_desc, L"./resources/2P_desc.png");
 	loadimage(&img_select_background_right, L"./resources/select_background.png");
 	flipImage(&img_select_background_right, &img_select_background_left);
 	loadimage(&img_selector_tip, L"./resources/selector_tip.png");
-	loadimage(&img_selector_background, L"./resoources/selector_background.png");
+	loadimage(&img_selector_background, L"./resources/selector_background.png");
 	loadimage(&img_1P_selector_btn_idle_right, L"./resources/1P_selector_btn_idle.png");
 	flipImage(&img_1P_selector_btn_idle_right, &img_1P_selector_btn_idle_left);
 	loadimage(&img_1P_selector_btn_down_right, L"./resources/1P_selector_btn_down.png");
@@ -220,7 +223,7 @@ int main()
 		last_tick_time = current_tick_time;
 
 		cleardevice();
-		scene_manager.on_draw();
+		scene_manager.on_draw(main_camera);
 
 		FlushBatchDraw();
 
