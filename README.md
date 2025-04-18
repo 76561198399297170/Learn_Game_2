@@ -2692,4 +2692,380 @@ private:
 
 ### 计时器类实现
 
-创建文件Timer.h头文件创建Timer类
+创建文件Timer.h头文件创建Timer类，声明六项私有成员变量并设计成员方法，提供了reset重置计时器时钟，setWaitTime设置等待时间，setOneShot设置是否单次触发，setCallback设置回调函数，pause使计时器暂停计时，resume使计时器继续进行计时， 最后是核心的更新逻辑on_updata，首先判断是否暂停如果暂停则直接返回，随后对过去时间累加更新帧时间并将计时器启动以来过去的时间与期望时间比较，尝试触发定时器回调函数，注意要检查是否单次触发与是否被触发与callback是否有效才触发callback回调函数，最后进行标记并清空计时：
+
+```
+#ifndef _TIMER_H_
+#define _TIMER_H_
+
+#include <functional>
+
+class Timer
+{
+public:
+	Timer() = default;
+	~Timer() = default;
+	
+	void restart()
+	{
+		this->m_pass_time = 0;
+		this->is_shotted = false;
+	}
+
+	void setWaitTime(int wait_time)
+	{
+		this->m_wait_time = wait_time;
+	}
+
+	void setOneShot(bool is_one_shot)
+	{
+		this->is_one_shot = is_one_shot;
+	}
+
+	void setCallback(std::function<void()> callback)
+	{
+		this->m_callback = callback;
+	}
+
+	void pause()
+	{
+		this->is_paused = true;
+	}
+
+	void resume()
+	{
+		this->is_paused = false;
+	}
+
+	void on_updata(int delta)
+	{
+		if (!this->is_paused)
+		{
+			this->m_pass_time += delta;
+			if (this->m_pass_time >= this->m_wait_time) 
+			{
+				if ((!this->is_one_shot || (this->is_one_shot && !this->is_shotted)) && this->m_callback) this->m_callback();
+
+				this->is_shotted = true;
+				this->m_pass_time = 0;
+			}
+		}
+	}
+
+private:
+	int m_pass_time = 0;//已过时间
+	int m_wait_time = 0;//等待时间
+	bool is_paused = false;//是否暂停
+	bool is_shotted = false;//是否触发
+	bool is_one_shot = false;//是否单次触发
+	std::function<void()> m_callback;//回调函数
+
+};
+
+#endif
+```
+
+
+
+代码完成，我们应该开始继承到摄像机类中吗？不，在前面的学习部分已进行了说明，每当我们完成一个功能模块的开发应首要完成的是对其进行测试，避免代码错误累加导致调式困难。
+
+来到menuScene.h头文件中引入timer.h头文件并在私有成员中定义Timer对象在on_enter中对非法进行设置，在on_updata中对方法进行更新，运行程序可以看到命令行每隔一秒重复输出"WOOF!!"即正确完成：
+
+```
+//成员变量声明
+Timer m_timer;
+
+//成员函数on_enter进行初始化
+this->m_timer.setWaitTime(1000);
+this->m_timer.setOneShot(false);
+this->m_timer.setCallback(
+    []()
+    {
+        std::cout << "WOOF!!" << std::endl;
+    }
+);
+
+//成员函数on_updata更新计时器
+this->m_timer.on_updata(delta);
+```
+
+
+
+### 摄像机抖动
+
+首先先考虑摄像头抖动效果应如何设计，在前面的设计中我们将摄像头看作世界坐标与窗口坐标的转换器，即将世界坐标与摄像头坐标做差即可得到渲染图形坐标，如果需要将屏幕中所有内容进行抖动就可以改为快速晃动摄像头即可，即在短时间内快速改变摄像头坐标就行，不过晃动方式不同呈现的效果也会不同，一种简单的方法是在以抖动强度为半径的院内随机设置摄像头的位置，因为帧更新速度很快所以在宏观上可以做到抖动效果，如果想要抖动更加平滑可以使用柏林噪音生成的随机数取代简单的随机数生成，不过这就涉及到深层的算法问题了，且本项目摄像机小幅度抖动使用柏林噪声优化提升不大，所以此处不多做涉及仅使用简单的随机数生成即可。
+
+接下来就可以将计时器集成到摄像头中了，打开camera.h文件并引入timer.h头文件，扩展三个成员变量计时器，是否抖动中和抖动幅度用于控制摄像头抖动效果，随后，为了启用抖动效果提供shake成员函数设置启动抖动并设置强度与抖动时长，最后修改on_updata中内容更新计时器并根据状态进行抖动，并且我们希望测试其是否成功完成，打开menuScene.h头文件在on_input中编写在按下空格时启动抖动，运行程序发现成功抖动完成：
+
+```
+//camera.h成员变量声明
+Timer m_shake_timer;
+bool is_shaking = false;
+float m_shaking_strength = 0;
+
+//camera.h构造函数初始化计时器
+this->m_shake_timer.setOneShot(true);
+this->m_shake_timer.setCallback(
+	[&]()
+	{
+		this->is_shaking = false;
+		this->restart();
+	}
+);
+
+//camera.h成员函数shake编写
+void shake(float strength, int duration)
+{
+	this->is_shaking = true;
+	this->m_shaking_strength = strength;
+
+	this->m_shake_timer.setWaitTime(duration);
+	this->m_shake_timer.restart();
+}
+
+//camera.h修改成员函数on_updata内容
+this->m_shake_timer.on_updata(delta);
+
+if (this->is_shaking)
+{
+	float radius = this->m_shaking_strength;
+	float angle = (float)(rand() % 360) * 3.141592f / 180.0f;
+
+	this->m_position.m_x = radius * cos(angle);
+	this->m_position.m_y = radius * sin(angle);
+}
+
+//menuScene.h中修改on_input成员函数
+if (msg.message == WM_KEYDOWN)
+{
+    if (msg.vkcode == VK_SPACE) this->m_camera.shake(10, 350);
+    else scene_manager.switchTo(SceneManager::SceneType::Selector);
+}
+```
+
+
+
+## 第五节代码完成展示
+
+**menuScene.h**
+
+```
+#ifndef _MENU_SCENE_H_
+#define _MENU_SCENE_H_
+
+#include "scene.h"
+#include "sceneManager.h"
+
+#include "timer.h"
+#include "animation.h"
+#include "camera.h"
+
+#include <iostream>
+
+extern Atlas atlas_gamer1_run_right;
+
+extern SceneManager scene_manager;
+
+class MenuScene : public Scene
+{
+public:
+	MenuScene() = default;
+	~MenuScene() = default;
+
+	virtual void on_enter()
+	{
+		this->m_animation_gamer1_run_right.setAtlas(&atlas_gamer1_run_right);
+		this->m_animation_gamer1_run_right.setInterval(75);
+		this->m_animation_gamer1_run_right.setLoop(true);
+		
+		this->m_timer.setWaitTime(1000);
+		this->m_timer.setOneShot(false);
+		this->m_timer.setCallback(
+			[]()
+			{
+				std::cout << "WOOF!!" << std::endl;
+			}
+		);
+	}
+
+	virtual void on_update(int delta)
+	{
+		this->m_timer.on_updata(delta);
+		this->m_camera.on_updata(delta);
+		this->m_animation_gamer1_run_right.on_update(delta);
+	}
+
+	virtual void on_draw()
+	{
+		const Vector2& pos_camera = this->m_camera.getPosition();
+		this->m_animation_gamer1_run_right.on_draw((int)(100 - pos_camera.m_x), (int)(100 - pos_camera.m_y));
+	}
+
+	virtual void on_input(const ExMessage& msg)
+	{
+		if (msg.message == WM_KEYDOWN)
+		{
+			if (msg.vkcode == VK_SPACE) this->m_camera.shake(10, 350);
+			else scene_manager.switchTo(SceneManager::SceneType::Selector);
+		}
+	}
+
+	virtual void on_exit()
+	{
+		std::cout << "主菜单退出！" << std::endl;
+	}
+
+private:
+	Animation m_animation_gamer1_run_right;
+	Camera m_camera;
+	Timer m_timer;
+
+};
+
+#endif
+```
+
+**camera.h**
+
+```
+#ifndef _CAMERA_H_
+#define _CAMERA_H_
+
+#include "timer.h"
+#include "vector2.h"
+
+class Camera
+{
+public:
+	Camera()
+	{
+		this->m_shake_timer.setOneShot(true);
+		this->m_shake_timer.setCallback(
+			[&]()
+			{
+				this->is_shaking = false;
+				this->reset();
+			}
+		);
+	}
+
+	~Camera() = default;
+
+	void reset()
+	{
+		this->m_position.m_y = this->m_position.m_x = 0;
+	}
+
+	const Vector2& getPosition() const
+	{
+		return this->m_position;
+	}
+
+	void on_updata(int delta)
+	{
+		this->m_shake_timer.on_updata(delta);
+
+		if (this->is_shaking)
+		{
+			float radius = this->m_shaking_strength;
+			float angle = (float)(rand() % 360) * 3.141592f / 180.0f;
+
+			this->m_position.m_x = radius * cos(angle);
+			this->m_position.m_y = radius * sin(angle);
+		}
+	}
+
+	void shake(float strength, int duration)
+	{
+		this->is_shaking = true;
+		this->m_shaking_strength = strength;
+
+		this->m_shake_timer.setWaitTime(duration);
+		this->m_shake_timer.restart();
+	}
+
+private:
+	Vector2 m_position;
+	
+	Timer m_shake_timer;
+	bool is_shaking = false;
+	float m_shaking_strength = 0;
+
+};
+
+#endif
+```
+
+**timer.h**
+
+```
+#ifndef _TIMER_H_
+#define _TIMER_H_
+
+#include <functional>
+
+class Timer
+{
+public:
+	Timer() = default;
+	~Timer() = default;
+	
+	void restart()
+	{
+		this->m_pass_time = 0;
+		this->is_shotted = false;
+	}
+
+	void setWaitTime(int wait_time)
+	{
+		this->m_wait_time = wait_time;
+	}
+
+	void setOneShot(bool is_one_shot)
+	{
+		this->is_one_shot = is_one_shot;
+	}
+
+	void setCallback(std::function<void()> callback)
+	{
+		this->m_callback = callback;
+	}
+
+	void pause()
+	{
+		this->is_paused = true;
+	}
+
+	void resume()
+	{
+		this->is_paused = false;
+	}
+
+	void on_updata(int delta)
+	{
+		if (!this->is_paused)
+		{
+			this->m_pass_time += delta;
+			if (this->m_pass_time >= this->m_wait_time) 
+			{
+				if ((!this->is_one_shot || (this->is_one_shot && !this->is_shotted)) && this->m_callback) this->m_callback();
+
+				this->is_shotted = true;
+				this->m_pass_time = 0;
+			}
+		}
+	}
+
+private:
+	int m_pass_time = 0;//已过时间
+	int m_wait_time = 0;//等待时间
+	bool is_paused = false;//是否暂停
+	bool is_shotted = false;//是否触发
+	bool is_one_shot = false;//是否单次触发
+	std::function<void()> m_callback;//回调函数
+
+};
+
+#endif
+```
+
