@@ -5,11 +5,25 @@
 
 #include <graphics.h>
 
-void putImageAlpha(int dst_x, int dst_y, IMAGE* img)
+inline void putImageAlpha(int dst_x, int dst_y, IMAGE* img)
 {
 	int w = img->getwidth(), h = img->getheight();
 
 	AlphaBlend(GetImageHDC(GetWorkingImage()), dst_x, dst_y, w, h, GetImageHDC(img), 0, 0, w, h, { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA });
+}
+
+inline void putImageAlpha(const Camera& camera, int dst_x, int dst_y, IMAGE* img)
+{
+	int w = img->getwidth(), h = img->getheight();
+
+	AlphaBlend(GetImageHDC(GetWorkingImage()), (int)(dst_x - camera.getPosition().m_x), (int)(dst_y - camera.getPosition().m_y), w, h, GetImageHDC(img), 0, 0, w, h, { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA });
+}
+
+inline void putImageAlpha(int dst_x, int dst_y, int width, int height, IMAGE* img, int src_x, int src_y)
+{
+	int w = width > 0 ? width : img->getwidth(), h = height > 0 ? height : img->getheight();
+
+	AlphaBlend(GetImageHDC(GetWorkingImage()), dst_x, dst_y, w, h, GetImageHDC(img), src_x, src_y, w, h, { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA });
 }
 
 inline void flipImage(IMAGE* src, IMAGE* dst)

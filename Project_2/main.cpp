@@ -108,6 +108,8 @@ void loadGameResources()
 	AddFontResourceEx(L"./resources/HYPixel11pxU-2.ttf", FR_PRIVATE, NULL);
 
 	loadimage(&img_menu_background, L"./resources/menu_background.png");
+
+	loadimage(&img_VS, L"./resources/VS.png");
 	loadimage(&img_1P, L"./resources/1P.png");
 	loadimage(&img_2P, L"./resources/2P.png");
 	loadimage(&img_1P_desc, L"./resources/1P_desc.png");
@@ -203,8 +205,11 @@ int main()
 	menu_scene = new MenuScene();
 	game_scene = new GameScene();
 	selector_scene = new SelectorScene();
+
 	scene_manager.setCurrentState(menu_scene);
 
+	settextstyle(28, 0, L"HYPixel11pxU-2.ttf");
+	setbkmode(TRANSPARENT);
 
 	BeginBatchDraw();
 	while (true)

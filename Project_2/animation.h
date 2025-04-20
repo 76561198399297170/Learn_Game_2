@@ -4,6 +4,8 @@
 #include "atlas.h"
 #include "utils.h"
 
+#include "camera.h"
+#include <graphics.h>
 #include <functional>
 
 class Animation
@@ -74,9 +76,9 @@ public:
 		}
 	}
 
-	void on_draw(int x, int y) const
+	void on_draw(const Camera& camera, int x, int y) const
 	{
-		putImageAlpha(x, y, this->m_atlas->getImage(this->m_idx_frame));
+		putImageAlpha(camera, x, y, this->m_atlas->getImage(this->m_idx_frame));
 	}
 
 private:
