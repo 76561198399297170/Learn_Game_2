@@ -4706,10 +4706,640 @@ putImageAlpha(camera, this->pos_img_hills.x, this->pos_img_hills.y, &img_hills);
 
 
 
+### 简单物理实现——平台
+
 接下来就可以实现简单的物理效果了，本项目较新的的碰撞效果"重力"效果，也就是在虚空内会受重力影响不断地受重力影响不断向下坠落，直到到达地面（或者摔死了>D<），也就是模拟重力的效果可以从悬浮空中的下坠和到达地面的停止，而关于地面也是相当抽象的概念。
 
 在平台游戏中玩家可踩踏的对象，可以是游戏最下方的地面，也可以是箱子或道具，甚至是敌人或玩家，而在本项目中只考虑最简单的情况即玩家可落到"平台"上，所以我们可以将平台对象定义为类，但是我们也要思考应该使用什么样的几何图形来拟合平台碰撞区域，可能我们会第一时间想到矩形，但是要明确一点的是在游戏开发代码编写过程中，我们只需要让程序所展示出来的功能符合游戏逻辑即可，不必要的要求像显示一样对其进行一比一复刻。
 
 所以也需要思考游戏平台是否有更好的设计思路，由于此类2D视角缺失了深度这一维度轴，所以对于此类游戏平台大多被设计为了单向碰撞，也就是玩家从下方可以正常穿过，从上方可以坠落到平台上，所以矩形碰撞箱就没有太大必要了，要关注的点实际上是平台对象的"地面"在哪，于是这种平台我们可以抽象成一条线。
 
-所以代码方面，首先创建platform.h头文件定义
+所以代码方面，首先创建platform.h头文件定义Plantform类，在类内定义结构体CollisionShape表示碰撞外形，并在其中声明三个变量：高度，左侧点右侧点即可描述一条线最后在类内定义碰撞外形，添加IMAGE指针做渲染对象以及渲染对象坐标（碰撞位置与图片位置通常不一致，所以此处需要额外声明），引入绘图逻辑所需头文件，并声明on_draw方法使用camera在其中传递渲染出平台：
+
+```
+#ifndef _PLATFORM_H_
+#define _PLATFORM_H_
+
+#include "utils.h"
+#include "camera.h"
+
+class Platform
+{
+public:
+	Platform() = default;
+	~Platform() = default;
+
+	void on_draw(const Camera& camera) const
+	{
+		putImageAlpha(this->m_render_position.x, this->m_render_position.y, this->m_img);
+	}
+
+public:
+	struct CollisionShape
+	{
+		float y;
+		float left, right;
+	};
+
+public:
+	CollisionShape m_shape;
+
+	IMAGE* m_img = nullptr;
+	POINT m_render_position = { 0 };
+
+};
+
+#endif
+```
+
+
+
+而平台的存储此处还是使用全局数组vector存储，来到main.cpp文件引入所需头文件，在全局区添加vector平台类型向量，随后来到on_enter方法中添加初始化，由于目前只提供四个平台所以先初始化平台数量为4，所以以此给与其赋值操作，最后在on_draw中添加遍历绘制所有平台的方法，运行程序可以看到三个平台正常渲染则说明成功完成渲染部分：
+
+```
+//main.cpp中全局区添加代码
+#include <vector>
+#include "platform.h"
+
+std::vector<Platform> platform_list;
+
+//gameScene.h中全局区添加代码
+#include "platform.h"
+
+extern std::vector<Platform> platform_list;
+
+//gameScene.h文件GameScene类内on_enter初始化
+platform_list.resize(4);
+Platform& large_platform = platform_list[0];
+large_platform.m_img = &img_platform_large;
+large_platform.m_render_position.x = 122;
+large_platform.m_render_position.y = 455;
+large_platform.m_shape.left = (float)large_platform.m_render_position.x + 30;
+large_platform.m_shape.right = (float)large_platform.m_render_position.x + img_platform_large.getwidth() - 30;
+large_platform.m_shape.y = (float)large_platform.m_render_position.y + 60;
+
+Platform& small_platform_1 = platform_list[1];
+small_platform_1.m_img = &img_platform_small;
+small_platform_1.m_render_position.x = 175;
+small_platform_1.m_render_position.y = 360;
+small_platform_1.m_shape.left = (float)small_platform_1.m_render_position.x + 40;
+small_platform_1.m_shape.right = (float)small_platform_1.m_render_position.x + img_platform_small.getwidth() - 40;
+small_platform_1.m_shape.y = (float)small_platform_1.m_render_position.y + img_platform_small.getheight() / 2;
+
+Platform& small_platform_2 = platform_list[2];
+small_platform_2.m_img = &img_platform_small;
+small_platform_2.m_render_position.x = 855;
+small_platform_2.m_render_position.y = 360;
+small_platform_2.m_shape.left = (float)small_platform_2.m_render_position.x + 40;
+small_platform_2.m_shape.right = (float)small_platform_2.m_render_position.x + img_platform_small.getwidth() - 40;
+small_platform_2.m_shape.y = (float)small_platform_2.m_render_position.y + img_platform_small.getheight() / 2;
+
+Platform& small_platform_3 = platform_list[3];
+small_platform_3.m_img = &img_platform_small;
+small_platform_3.m_render_position.x = 515;
+small_platform_3.m_render_position.y = 255;
+small_platform_3.m_shape.left = (float)small_platform_3.m_render_position.x + 40;
+small_platform_3.m_shape.right = (float)small_platform_3.m_render_position.x + img_platform_small.getwidth() - 40;
+small_platform_3.m_shape.y = (float)small_platform_3.m_render_position.y + img_platform_small.getheight() / 2;
+
+//gameScene.h文件GameScene类内on_enter初始化
+for (const Platform& p : platform_list)
+{
+	p.on_draw(camera);
+}
+
+```
+
+
+
+不过此处只有图形渲染效果不包含数据，所以我们希望添加简单的调试模式，只有就可以显示所有我们希望看见的外边框或数据，帮助开发者对这些抽象碰撞数据进行可视化检查。
+
+首先来到main.cpp中定义is_debug布尔类型，随后在platform.h文件通过extern获取，并在Platform类内的on_draw方法中通过检查debug状态是否开启来绘制碰撞线，由于使用了Camera进行摄像机重载版本，所有在utils.h中重载一个line方法用于绘制碰撞线，最后在platform.h文件写on_draw方法绘制，并且在gameScene.h文件写on_input的切换debug方法，这时运行程序并按下Q键即可看到正确渲染碰撞横线，这种可视化调试对开发者编程工作帮助极大，后面在做玩家碰撞时便可以得见：
+
+```
+//main.cpp文件全局区
+bool is_debug = false;
+
+//platform.h文件全局区
+extern bool is_debug;
+
+//utils.h文件编写
+inline void line(const Camera& camera, int x1, int y1, int x2, int y2)
+{
+	const Vector2& pos_camera = camera.getPosition();
+	line((int)(x1 - pos_camera.m_x), (int)(y1 - pos_camera.m_y), (int)(x2 - pos_camera.m_x), (int)(y2 - pos_camera.m_y));
+}
+
+//platform.h文件on_draw方法
+if (is_debug)
+{
+	setlinecolor(RGB(255, 0, 0));
+	line(camera, (int)this->m_shape.left, (int)this->m_shape.y, (int)this->m_shape.right, (int)this->m_shape.y);
+}
+
+//gameScene.h文件on_input方法
+switch (msg.message)
+{
+case WM_KEYDOWN:
+	break;
+case WM_KEYUP:
+	switch (msg.vkcode)
+	{
+	case 0x51://'Q'
+		is_debug = !is_debug;
+		break;
+	default:
+		break;
+	}
+	break;
+default:
+	break;
+}
+```
+
+
+
+## 第八节完成代码展示
+
+**main.cpp**
+
+```
+#include "atlas.h"
+#include "camera.h"
+
+#include "scene.h"
+#include "sceneManager.h"
+#include "menuScene.h"
+#include "gameScene.h"
+#include "selectorScene.h"
+
+#include "utils.h"
+#include "platform.h"
+
+#pragma comment(lib, "Winmm.lib")
+
+#include <graphics.h>
+#include <vector>
+
+const int FPS = 60;
+
+bool is_debug = false;
+
+Camera main_camera;
+
+std::vector<Platform> platform_list;
+
+IMAGE img_menu_background;					//主菜单背景图片
+
+IMAGE img_VS;								//VS 艺术字图片
+IMAGE img_1P;								//1P 文本图片
+IMAGE img_2P;								//2P 文本图片
+IMAGE img_1P_desc;							//1P 键位描述图片
+IMAGE img_2P_desc;							//2P 键位描述图片
+IMAGE img_select_background_left;			//选人朝左背景图片
+IMAGE img_select_background_right;			//选人朝右背景图片
+IMAGE img_selector_tip;						//选人界面提示信息
+IMAGE img_selector_background;				//选人界面背景图
+IMAGE img_1P_selector_btn_idle_left;		//1P 向左选择按钮默认状态图片
+IMAGE img_1P_selector_btn_idle_right;		//1P 向右选择按钮默认状态图片
+IMAGE img_1P_selector_btn_down_left;		//1P 向左选择按钮按下状态图片
+IMAGE img_1P_selector_btn_down_right;		//1P 向右选择按钮按下状态图片
+IMAGE img_2P_selector_btn_idle_left;		//2P 向左选择按钮默认状态图片
+IMAGE img_2P_selector_btn_idle_right;		//2P 向右选择按钮默认状态图片
+IMAGE img_2P_selector_btn_down_left;		//2P 向左选择按钮按下状态图片
+IMAGE img_2P_selector_btn_down_right;		//2P 向右选择按钮按下状态图片
+IMAGE img_gamer1_selector_background_left;	//选人界面类型1朝左背景图片
+IMAGE img_gamer1_selector_background_right;	//选人界面类型1朝右背景图片
+IMAGE img_gamer2_selector_background_left;	//选人界面类型2朝左背景图片
+IMAGE img_gamer2_selector_background_right;	//选人界面类型2朝右背景图片
+
+IMAGE img_sky;								//填空图片
+IMAGE img_hills;							//山脉图片
+IMAGE img_platform_large;					//大型平台图片
+IMAGE img_platform_small;					//小型平台图片
+
+IMAGE img_1P_cursor;						//1P 指示光标图片
+IMAGE img_2P_cursor;						//2P 指示光标图片
+
+Atlas atlas_gamer1_idle_left;				//类型1向左默认动画图集
+Atlas atlas_gamer1_idle_right;				//类型1向右默认动画图集
+Atlas atlas_gamer1_run_left;				//类型1向左奔跑动画图集
+Atlas atlas_gamer1_run_right;				//类型1向右奔跑动画图集
+Atlas atlas_gamer1_attack_ex_left;			//类型1向左特殊攻击动画图集
+Atlas atlas_gamer1_attack_ex_right;			//类型1向右特殊攻击动画图集
+Atlas atlas_gamer1_die_left;				//类型1向左死亡动画图集
+Atlas atlas_gamer1_die_right;				//类型1向右死亡动画图集
+
+Atlas atlas_gamer2_idle_left;				//类型2向左默认动画图集
+Atlas atlas_gamer2_idle_right;				//类型2向右默认动画图集
+Atlas atlas_gamer2_run_left;				//类型2向左奔跑动画图集
+Atlas atlas_gamer2_run_right;				//类型2向右奔跑动画图集
+Atlas atlas_gamer2_attack_ex_left;			//类型2向左特殊攻击动画图集
+Atlas atlas_gamer2_attack_ex_right;			//类型2向右特殊攻击动画图集
+Atlas atlas_gamer2_die_left;				//类型2向左死亡动画图集
+Atlas atlas_gamer2_die_right;				//类型2向右死亡动画图集
+
+IMAGE img_gamer1_bullet;					//类型1子弹图片
+Atlas atlas_gamer1_bullet_break;			//类型1子弹破碎动画图集
+Atlas atlas_gemer2_bullet;					//类型2子弹动画图集
+Atlas atlas_gemer2_bullet_explode;			//类型2子弹爆炸动画图集
+Atlas atlas_gamer2_bullet_ex;				//类型2特殊类型子弹动画图集
+Atlas atlas_gamer2_bullet_ex_explode;		//类型2特殊类型子弹爆炸动画图集
+Atlas atlas_gamer2_bullet_text;				//类型2特殊类型子弹爆炸文本动画图集
+
+Atlas atlas_run_effect;						//奔跑特效动画图集
+Atlas atlas_jump_effect;					//跳跃特效动画图集
+Atlas atlas_land_effect;					//落地特效动画图集
+
+IMAGE img_winner_bar;						//获胜玩家背景图片
+IMAGE img_1P_winner;						//1P 获胜文本图片
+IMAGE img_2P_winner;						//2P 获胜文本图片
+
+IMAGE img_avatar_gamer1;					//类型1头像图片
+IMAGE img_avatar_gamer2;					//类型2头像图片
+
+Scene* menu_scene = nullptr;
+Scene* game_scene = nullptr;
+Scene* selector_scene = nullptr;
+
+SceneManager scene_manager;
+
+void flipAtlas(Atlas& src, Atlas& dst)
+{
+	dst.clear();
+	for (int i = 0; i < src.getSize(); i++)
+	{
+		IMAGE img_flpipped;
+		flipImage(src.getImage(i), &img_flpipped);
+		dst.addImage(img_flpipped);
+	}
+}
+
+void loadGameResources()
+{
+	AddFontResourceEx(L"./resources/HYPixel11pxU-2.ttf", FR_PRIVATE, NULL);
+
+	loadimage(&img_menu_background, L"./resources/menu_background.png");
+
+	loadimage(&img_VS, L"./resources/VS.png");
+	loadimage(&img_1P, L"./resources/1P.png");
+	loadimage(&img_2P, L"./resources/2P.png");
+	loadimage(&img_1P_desc, L"./resources/1P_desc.png");
+	loadimage(&img_2P_desc, L"./resources/2P_desc.png");
+	loadimage(&img_select_background_right, L"./resources/select_background.png");
+	flipImage(&img_select_background_right, &img_select_background_left);
+	loadimage(&img_selector_tip, L"./resources/selector_tip.png");
+	loadimage(&img_selector_background, L"./resources/selector_background.png");
+	loadimage(&img_1P_selector_btn_idle_right, L"./resources/1P_selector_btn_idle.png");
+	flipImage(&img_1P_selector_btn_idle_right, &img_1P_selector_btn_idle_left);
+	loadimage(&img_1P_selector_btn_down_right, L"./resources/1P_selector_btn_down.png");
+	flipImage(&img_1P_selector_btn_down_right, &img_1P_selector_btn_down_left);
+	loadimage(&img_2P_selector_btn_idle_right, L"./resources/2P_selector_btn_idle.png");
+	flipImage(&img_2P_selector_btn_idle_right, &img_2P_selector_btn_idle_left);
+	loadimage(&img_2P_selector_btn_down_right, L"./resources/2P_selector_btn_down.png");
+	flipImage(&img_2P_selector_btn_down_right, &img_2P_selector_btn_down_left);
+	loadimage(&img_gamer1_selector_background_right, L"./resources/gamer1_selector_background.png");
+	flipImage(&img_gamer1_selector_background_right, &img_gamer1_selector_background_left);
+	loadimage(&img_gamer2_selector_background_right, L"./resources/gamer2_selector_background.png");
+	flipImage(&img_gamer2_selector_background_right, &img_gamer2_selector_background_left);
+
+	loadimage(&img_sky, L"./resources/sky.png");
+	loadimage(&img_hills, L"./resources/hills.png");
+	loadimage(&img_platform_large, L"./resources/platform_large.png");
+	loadimage(&img_platform_small, L"./resources/platform_small.png");
+
+	loadimage(&img_1P_cursor, L"./resources/1P_cursor.png");
+	loadimage(&img_2P_cursor, L"./resources/2P_cursor.png");
+
+	atlas_gamer1_idle_right.loadFromFile(L"./resources/gamer1_idle_%d.png", 9);
+	flipAtlas(atlas_gamer1_idle_right, atlas_gamer1_idle_left);
+	atlas_gamer1_run_right.loadFromFile(L"./resources/gamer1_run_%d.png", 5);
+	flipAtlas(atlas_gamer1_run_right, atlas_gamer1_run_left);
+	atlas_gamer1_attack_ex_right.loadFromFile(L"./resources/gamer1_attack_ex_%d.png", 3);
+	flipAtlas(atlas_gamer1_attack_ex_right, atlas_gamer1_attack_ex_left);
+	atlas_gamer1_die_right.loadFromFile(L"./resources/gamer1_die_%d.png", 4);
+	flipAtlas(atlas_gamer1_die_right, atlas_gamer1_die_left);
+
+	atlas_gamer2_idle_right.loadFromFile(L"./resources/gamer2_idle_%d.png", 8);
+	flipAtlas(atlas_gamer2_idle_right, atlas_gamer2_idle_left);
+	atlas_gamer2_run_right.loadFromFile(L"./resources/gamer2_run_%d.png", 5);
+	flipAtlas(atlas_gamer2_run_right, atlas_gamer2_run_left);
+	atlas_gamer2_attack_ex_right.loadFromFile(L"./resources/gamer2_attack_ex_%d.png", 9);
+	flipAtlas(atlas_gamer2_attack_ex_right, atlas_gamer2_attack_ex_left);
+	atlas_gamer2_die_right.loadFromFile(L"./resources/gamer2_die_%d.png", 2);
+	flipAtlas(atlas_gamer2_die_right, atlas_gamer2_die_left);
+
+	loadimage(&img_gamer1_bullet, L"./resources/gamer_bullet.png");
+	atlas_gamer1_bullet_break.loadFromFile(L"./resources/gamer1_bullet_break_%d.png", 3);
+	atlas_gemer2_bullet.loadFromFile(L"./resources/gamer2_bullet_%d.png", 5);
+	atlas_gemer2_bullet_explode.loadFromFile(L"./resources/gamer2_bullet_explode_%d.png", 5);
+	atlas_gamer2_bullet_ex.loadFromFile(L"./resources/gamer2_bullet_ex_%d.png", 5);
+	atlas_gamer2_bullet_ex_explode.loadFromFile(L"./resources/gamer2_bullet_ex_explode_%d.png", 5);
+	atlas_gamer2_bullet_text.loadFromFile(L"./resources/gamer2_bullet_text_%d.png", 6);
+
+	atlas_run_effect.loadFromFile(L"./resources/run_effect_%d.png", 4);
+	atlas_jump_effect.loadFromFile(L"./resources/jump_effect_%d.png", 5);
+	atlas_land_effect.loadFromFile(L"./resources/land_effect_%d.png", 2);
+
+	loadimage(&img_1P_winner, L"./resources/1P_winner.png");
+	loadimage(&img_2P_winner, L"./resources/2P_winner.png");
+	loadimage(&img_winner_bar, L"./resources/winner_bar.png");
+
+	loadimage(&img_avatar_gamer1, L"./resources/avatar_gamer1.png");
+	loadimage(&img_avatar_gamer2, L"./resources/avatar_gamer2.png");
+
+	mciSendString(L"open ./resources/bgm_game.mp3 alias bgm_game", NULL, 0, NULL);
+	mciSendString(L"open ./resources/bgm_menu.mp3 alias bgm_menu", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer1_bullet_break_1.mp3 alias gamer1_bullet_break_1", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer1_bullet_break_2.mp3 alias gamer1_bullet_break_2", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer1_bullet_break_3.mp3 alias gamer1_bullet_break_3", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer1_bullet_shoot_1.mp3 alias gamer1_bullet_shoot_1", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer1_bullet_shoot_2.mp3 alias gamer1_bullet_shoot_2", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer1_bullet_shoot_ex.mp3 alias gamer1_bullet_shoot_ex", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer2_bullet_explode.mp3 alias gamer2_bullet_explode", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer2_bullet_explode_ex.mp3 alias gamer2_bullet_explode_ex", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer2_bullet_text.mp3 alias gamer2_bullet_text", NULL, 0, NULL);
+	mciSendString(L"open ./resources/ui_confirm.wav alias ui_confirm", NULL, 0, NULL);
+	mciSendString(L"open ./resources/ui_switch.wav alias ui_switch", NULL, 0, NULL);
+	mciSendString(L"open ./resources/ui_win.wav alias ui_win", NULL, 0, NULL);
+
+	return;
+}
+
+int main()
+{
+	ExMessage msg;
+
+	loadGameResources();
+	
+	initgraph(1200, 720);
+
+	menu_scene = new MenuScene();
+	game_scene = new GameScene();
+	selector_scene = new SelectorScene();
+
+	scene_manager.setCurrentState(menu_scene);
+
+	settextstyle(28, 0, L"HYPixel11pxU-2.ttf");
+	setbkmode(TRANSPARENT);
+
+	BeginBatchDraw();
+	while (true)
+	{
+		DWORD frame_start_time = GetTickCount();
+
+		while (peekmessage(&msg))
+		{
+			scene_manager.on_input(msg);
+		}
+
+		static DWORD last_tick_time = GetTickCount();
+		DWORD current_tick_time = GetTickCount();
+		DWORD delta_tick_time = current_tick_time - last_tick_time;
+		scene_manager.on_updata(delta_tick_time);
+		last_tick_time = current_tick_time;
+
+		cleardevice();
+		scene_manager.on_draw(main_camera);
+
+		FlushBatchDraw();
+
+		DWORD frame_end_time = GetTickCount();
+		DWORD frame_delta_time = frame_end_time - frame_start_time;
+		if (frame_delta_time < 1000 / FPS)
+		{
+			Sleep(1000 / FPS - frame_delta_time);
+		}
+
+	}
+	EndBatchDraw();
+
+	return 0;
+}
+```
+
+**utils.h**
+
+```
+#ifndef _UTILS_H_
+#define _UTILS_H_
+
+#pragma comment(lib, "MSIMG32.LIB")
+
+#include <graphics.h>
+
+inline void putImageAlpha(int dst_x, int dst_y, IMAGE* img)
+{
+	int w = img->getwidth(), h = img->getheight();
+
+	AlphaBlend(GetImageHDC(GetWorkingImage()), dst_x, dst_y, w, h, GetImageHDC(img), 0, 0, w, h, { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA });
+}
+
+inline void putImageAlpha(const Camera& camera, int dst_x, int dst_y, IMAGE* img)
+{
+	int w = img->getwidth(), h = img->getheight();
+
+	AlphaBlend(GetImageHDC(GetWorkingImage()), (int)(dst_x - camera.getPosition().m_x), (int)(dst_y - camera.getPosition().m_y), w, h, GetImageHDC(img), 0, 0, w, h, { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA });
+}
+
+inline void putImageAlpha(int dst_x, int dst_y, int width, int height, IMAGE* img, int src_x, int src_y)
+{
+	int w = width > 0 ? width : img->getwidth(), h = height > 0 ? height : img->getheight();
+
+	AlphaBlend(GetImageHDC(GetWorkingImage()), dst_x, dst_y, w, h, GetImageHDC(img), src_x, src_y, w, h, { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA });
+}
+
+inline void line(const Camera& camera, int x1, int y1, int x2, int y2)
+{
+	const Vector2& pos_camera = camera.getPosition();
+	line((int)(x1 - pos_camera.m_x), (int)(y1 - pos_camera.m_y), (int)(x2 - pos_camera.m_x), (int)(y2 - pos_camera.m_y));
+}
+
+inline void flipImage(IMAGE* src, IMAGE* dst)
+{
+	int w = src->getwidth(), h = src->getheight();
+	Resize(dst, w, h);
+	
+	DWORD* src_buffer = GetImageBuffer(src);
+	DWORD* dst_buffer = GetImageBuffer(dst);
+	for (int i = 0; i < h; i++)
+	{
+		for (int j = 0; j < w; j++)
+		{
+			int src_idx = i * w + j, dst_idx = (i + 1) * w - j - 1;
+			dst_buffer[dst_idx] = src_buffer[src_idx];
+		}
+	}
+	return;
+}
+
+#endif
+```
+
+**platform.h**
+
+```
+#ifndef _PLATFORM_H_
+#define _PLATFORM_H_
+
+#include "utils.h"
+#include "camera.h"
+
+extern bool is_debug;
+
+class Platform
+{
+public:
+	Platform() = default;
+	~Platform() = default;
+
+	void on_draw(const Camera& camera) const
+	{
+		putImageAlpha(this->m_render_position.x, this->m_render_position.y, this->m_img);
+
+		if (is_debug)
+		{
+			setlinecolor(RGB(255, 0, 0));
+			line(camera, (int)this->m_shape.left, (int)this->m_shape.y, (int)this->m_shape.right, (int)this->m_shape.y);
+		}
+	}
+
+public:
+	struct CollisionShape
+	{
+		float y;
+		float left, right;
+	};
+
+public:
+	CollisionShape m_shape;
+
+	IMAGE* m_img = nullptr;
+	POINT m_render_position = { 0 };
+
+};
+
+#endif
+```
+
+**gameScene.h**
+
+```
+#ifndef _GAME_SCENE_H_
+#define _GAME_SCENE_H_
+
+#include "utils.h"
+#include "platform.h"
+#include "scene.h"
+#include "sceneManager.h"
+
+#include <iostream>
+
+extern IMAGE img_sky;
+extern IMAGE img_hills;
+extern IMAGE img_platform_large;
+extern IMAGE img_platform_small;
+
+extern Camera main_camera;
+
+extern std::vector<Platform> platform_list;
+
+extern SceneManager scene_manager;
+
+class GameScene : public Scene
+{
+public:
+	GameScene() = default;
+	~GameScene() = default;
+
+	virtual void on_enter()
+	{
+		this->pos_img_sky.x = (getwidth() - img_sky.getwidth()) / 2;
+		this->pos_img_sky.y = (getheight() - img_sky.getheight()) / 2;
+
+		this->pos_img_hills.x = (getwidth() - img_hills.getwidth()) / 2;
+		this->pos_img_hills.y = (getheight() - img_hills.getheight()) / 2;
+
+		platform_list.resize(4);
+		Platform& large_platform = platform_list[0];
+		large_platform.m_img = &img_platform_large;
+		large_platform.m_render_position.x = 122;
+		large_platform.m_render_position.y = 455;
+		large_platform.m_shape.left = (float)large_platform.m_render_position.x + 30;
+		large_platform.m_shape.right = (float)large_platform.m_render_position.x + img_platform_large.getwidth() - 30;
+		large_platform.m_shape.y = (float)large_platform.m_render_position.y + 60;
+
+		Platform& small_platform_1 = platform_list[1];
+		small_platform_1.m_img = &img_platform_small;
+		small_platform_1.m_render_position.x = 175;
+		small_platform_1.m_render_position.y = 360;
+		small_platform_1.m_shape.left = (float)small_platform_1.m_render_position.x + 40;
+		small_platform_1.m_shape.right = (float)small_platform_1.m_render_position.x + img_platform_small.getwidth() - 40;
+		small_platform_1.m_shape.y = (float)small_platform_1.m_render_position.y + img_platform_small.getheight() / 2;
+
+		Platform& small_platform_2 = platform_list[2];
+		small_platform_2.m_img = &img_platform_small;
+		small_platform_2.m_render_position.x = 855;
+		small_platform_2.m_render_position.y = 360;
+		small_platform_2.m_shape.left = (float)small_platform_2.m_render_position.x + 40;
+		small_platform_2.m_shape.right = (float)small_platform_2.m_render_position.x + img_platform_small.getwidth() - 40;
+		small_platform_2.m_shape.y = (float)small_platform_2.m_render_position.y + img_platform_small.getheight() / 2;
+
+		Platform& small_platform_3 = platform_list[3];
+		small_platform_3.m_img = &img_platform_small;
+		small_platform_3.m_render_position.x = 515;
+		small_platform_3.m_render_position.y = 255;
+		small_platform_3.m_shape.left = (float)small_platform_3.m_render_position.x + 40;
+		small_platform_3.m_shape.right = (float)small_platform_3.m_render_position.x + img_platform_small.getwidth() - 40;
+		small_platform_3.m_shape.y = (float)small_platform_3.m_render_position.y + img_platform_small.getheight() / 2;
+
+	}
+
+	virtual void on_update(int delta) {}
+
+	virtual void on_draw(const Camera& camera) 
+	{
+		putImageAlpha(camera, this->pos_img_sky.x, this->pos_img_sky.y, &img_sky);
+		putImageAlpha(camera, this->pos_img_hills.x, this->pos_img_hills.y, &img_hills);
+
+		for (const Platform& p : platform_list)
+		{
+			p.on_draw(camera);
+		}
+	}
+
+	virtual void on_input(const ExMessage& msg)
+	{
+		switch (msg.message)
+		{
+		case WM_KEYDOWN:
+			break;
+		case WM_KEYUP:
+			switch (msg.vkcode)
+			{
+			case 0x51://'Q'
+				is_debug = !is_debug;
+				break;
+			default:
+				break;
+			}
+			break;
+		default:
+			break;
+		}
+	}
+
+	virtual void on_exit() {}
+
+private:
+	POINT pos_img_sky = { 0 };
+	POINT pos_img_hills = { 0 };
+
+};
+
+#endif
+```
+
+
+
+## 第九节

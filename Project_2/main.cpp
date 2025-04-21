@@ -8,14 +8,20 @@
 #include "selectorScene.h"
 
 #include "utils.h"
+#include "platform.h"
 
 #pragma comment(lib, "Winmm.lib")
 
 #include <graphics.h>
+#include <vector>
 
 const int FPS = 60;
 
+bool is_debug = false;
+
 Camera main_camera;
+
+std::vector<Platform> platform_list;
 
 IMAGE img_menu_background;					//Ö÷²Ëµ¥±³¾°Í¼Æ¬
 
