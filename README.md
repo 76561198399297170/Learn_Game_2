@@ -4666,3 +4666,50 @@ inline void flipImage(IMAGE* src, IMAGE* dst)
 
 
 ## 第八节
+
+### 物理模拟引入
+
+当我们在游戏中引入物理引擎的时候，牛顿就称为了整个游戏世界的导演。
+
+游戏作品能否带给玩家以沉浸感很大程度取决于游戏中各类交互反馈是否符合玩家直觉，起跳后一段时间会落下，抛射物体会收重力落回地面，物理的模拟就是让世界的种种反馈尽可能区逼近显示存在。
+
+### 局内场景界面绘制
+
+首先来到gameScene.h文件中引入素材资源，并在GameScene中声明资源对应坐标，并在on_enter中初始化他们位置，由于为了摄像头抖动不显示黑边所以提供背景尺寸将会略大于窗口尺寸，并在on_draw中使用定义好的putImageAlpha方法渲染背景图片，运行程序正常看到背景即可：
+
+```
+//gameScene.h全局区引入资源
+#include "utils.h"
+
+extern IMAGE img_sky;
+extern IMAGE img_hills;
+extern IMAGE img_platform_large;
+extern IMAGE img_platform_small;
+
+extern Camera main_camera;
+
+//GameScene成员变量声明
+POINT pos_img_sky = { 0 };
+POINT pos_img_hills = { 0 };
+
+//GameScene成员函数on_enter
+this->pos_img_sky.x = (getwidth() - img_sky.getwidth()) / 2;
+this->pos_img_sky.y = (getheight() - img_sky.getheight()) / 2;
+
+this->pos_img_hills.x = (getwidth() - img_hills.getwidth()) / 2;
+this->pos_img_hills.y = (getheight() - img_hills.getheight()) / 2;
+
+//GameScene成员函数on_draw
+putImageAlpha(camera, this->pos_img_sky.x, this->pos_img_sky.y, &img_sky);
+putImageAlpha(camera, this->pos_img_hills.x, this->pos_img_hills.y, &img_hills);
+```
+
+
+
+接下来就可以实现简单的物理效果了，本项目较新的的碰撞效果"重力"效果，也就是在虚空内会受重力影响不断地受重力影响不断向下坠落，直到到达地面（或者摔死了>D<），也就是模拟重力的效果可以从悬浮空中的下坠和到达地面的停止，而关于地面也是相当抽象的概念。
+
+在平台游戏中玩家可踩踏的对象，可以是游戏最下方的地面，也可以是箱子或道具，甚至是敌人或玩家，而在本项目中只考虑最简单的情况即玩家可落到"平台"上，所以我们可以将平台对象定义为类，但是我们也要思考应该使用什么样的几何图形来拟合平台碰撞区域，可能我们会第一时间想到矩形，但是要明确一点的是在游戏开发代码编写过程中，我们只需要让程序所展示出来的功能符合游戏逻辑即可，不必要的要求像显示一样对其进行一比一复刻。
+
+所以也需要思考游戏平台是否有更好的设计思路，由于此类2D视角缺失了深度这一维度轴，所以对于此类游戏平台大多被设计为了单向碰撞，也就是玩家从下方可以正常穿过，从上方可以坠落到平台上，所以矩形碰撞箱就没有太大必要了，要关注的点实际上是平台对象的"地面"在哪，于是这种平台我们可以抽象成一条线。
+
+所以代码方面，首先创建platform.h头文件定义
