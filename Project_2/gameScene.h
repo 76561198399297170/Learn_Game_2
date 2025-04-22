@@ -5,8 +5,12 @@
 #include "platform.h"
 #include "scene.h"
 #include "sceneManager.h"
+#include "player.h"
 
 #include <iostream>
+
+extern Player* player_1;
+extern Player* player_2;
 
 extern IMAGE img_sky;
 extern IMAGE img_hills;
@@ -68,7 +72,11 @@ public:
 
 	}
 
-	virtual void on_update(int delta) {}
+	virtual void on_update(int delta)
+	{
+		player_1->on_update(delta);
+		player_2->on_update(delta);
+	}
 
 	virtual void on_draw(const Camera& camera) 
 	{

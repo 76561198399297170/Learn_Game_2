@@ -19,6 +19,9 @@
     <Filter Include="头文件\Manager">
       <UniqueIdentifier>{b8e865e8-d090-4389-90fb-4980c8789e89}</UniqueIdentifier>
     </Filter>
+    <Filter Include="头文件\Player">
+      <UniqueIdentifier>{153c7230-d01c-4319-a258-244665d045cd}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -61,6 +64,15 @@
     </ClInclude>
     <ClInclude Include="platform.h">
       <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="player.h">
+      <Filter>头文件\Player</Filter>
+    </ClInclude>
+    <ClInclude Include="playerGamer1.h">
+      <Filter>头文件\Player</Filter>
+    </ClInclude>
+    <ClInclude Include="playerGamer2.h">
+      <Filter>头文件\Player</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

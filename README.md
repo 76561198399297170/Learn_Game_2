@@ -5343,3 +5343,147 @@ private:
 
 
 ## 第九节
+
+### 简单物理实现——玩家
+
+当前已有平台对象作为碰撞的一部分，那么只有完成与之碰撞的另一半也就是玩家实体，物理系统在功能上才能称之为完善的，所以首先要考虑的便是如何对玩家类相关的逻辑进行抽象，首先从功能入手分析玩家类设计。
+
+所有的玩家类都能执行运动，跳跃，发射子弹的逻辑无非是触发逻辑的按键有所不同以及执行的效果不同，所有有之前场景设计阶段经验就可以类比Scene基类定义Player基类，作为不同角色类型生成的模板，并将所有玩家具备的数据与逻辑封装在里面，而实际所选角色则继承子Player类实现自己的逻辑。
+
+首先啊在头文件中创建筛选器Player，并在筛选器中创建头文件player.h，playerGamer1.h，playerGamer2.h，首先来到player.h中，创建Player类并引入camera.h定义on_update与on_draw两个成员方法，随后引入graphics.h并定义on_input方法：
+
+```
+#ifndef _PLAYER_H_
+#define _PLAYER_H_
+
+#include "camera.h"
+
+#include <graphics.h>
+
+class Player
+{
+public:
+	Player() = default;
+	~Player() = default;
+
+	virtual void on_update(int delta) {}
+
+	virtual void on_draw(const Camera& camera) {}
+
+	virtual void on_input(const ExMessage& msg) {}
+
+};
+
+
+#endif // !_PLAYER_H_
+```
+
+
+
+随后先将子类继承完成后再仔细思考补充基类代码，来到playerGamer1.h文件，声明并继承基类重写on_update方法输出提示词，同样的我们对playerGamer2.h文件中做同样的处理：
+
+```
+//playerGamer1.h文件
+#ifndef _PLAYERGAMER1_H_
+#define _PLAYERGAMER1_H_
+
+#include "player.h"
+
+#include <iostream>
+
+class PlayerGamer1 : public Player
+{
+public:
+	PlayerGamer1() = default;
+	~PlayerGamer1() = default;
+
+	virtual void on_update(int delta)
+	{
+		std::cout << "Gamer1 on update..." << std::endl;
+	}
+
+};
+
+#endif // !_PLAYERGAMER1_H_
+
+//playerGamer2.h文件下
+#ifndef _PLAYERGAMER2_H_
+#define _PLAYERGAMER2_H_
+
+#include "player.h"
+
+#include <iostream>
+
+class PlayerGamer2 : public Player
+{
+public:
+	PlayerGamer2() = default;
+	~PlayerGamer2() = default;
+
+	virtual void on_update(int delta)
+	{
+		std::cout << "Gamer2 on update..." << std::endl;
+	}
+
+};
+
+#endif // !_PLAYERGAMER2_H_
+```
+
+
+
+完成类定义，实例化的实现很容易发现因当是在选角场景中由玩家选择完成实现的，而局内也要使用角色，所以像这类跨越多场景的生命周期较长的对象，我们就同样使用全局创建变量的方法进行。
+
+来到main.cpp中在全局区引用player相关头文件，并定义两玩家角色指针，随后在selectorScene中在on_exit中编写退出逻辑，在全局区引入头文件以及变量，根据最后玩家不同类型实例化角色子类对象，最后来到gameScene.h中引入player.h头文件与player_1与player_2资源后就可以在on_update方法中调用其更新方法了，运行程序可以看到控制台输出即正确：
+
+```
+//main.cpp全局区声明
+#include "player.h"
+#include "playerGamer1.h"
+#include "playerGamer2.h"
+
+Player* player_1 = nullptr;
+Player* player_2 = nullptr;
+
+//selectorScene.h全局区声明
+#include "player.h"
+#include "playerGamer1.h"
+#include "playerGamer2.h"
+
+extern Player* player_1;
+extern Player* player_2;
+
+//selectorScene.h类内on_exit方法
+switch (this->m_player_type_1)
+{
+case PlayerType::Gamer1:
+	player_1 = new PlayerGamer1();
+	break;
+case PlayerType::Gamer2:
+	player_1 = new PlayerGamer2();
+	break;
+}
+
+switch (this->m_player_type_2)
+{
+case PlayerType::Gamer1:
+	player_2 = new PlayerGamer1();
+	break;
+case PlayerType::Gamer2:
+	player_2 = new PlayerGamer2();
+	break;
+}
+
+//gameScene.h全局区声明
+#include "player.h"
+
+extern Player* player_1;
+extern Player* player_2;
+
+//gameScene.h类内on_update方法
+player_1->on_update(delta);
+player_2->on_update(delta);
+```
+
+
+

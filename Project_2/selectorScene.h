@@ -8,6 +8,13 @@
 
 #include "animation.h"
 
+#include "player.h"
+#include "playerGamer1.h"
+#include "playerGamer2.h"
+
+extern Player* player_1;
+extern Player* player_2;
+
 extern IMAGE img_VS;
 extern IMAGE img_1P;
 extern IMAGE img_2P;
@@ -236,7 +243,28 @@ public:
 		}
 	}
 
-	virtual void on_exit() {}
+	virtual void on_exit()
+	{
+		switch (this->m_player_type_1)
+		{
+		case PlayerType::Gamer1:
+			player_1 = new PlayerGamer1();
+			break;
+		case PlayerType::Gamer2:
+			player_1 = new PlayerGamer2();
+			break;
+		}
+
+		switch (this->m_player_type_2)
+		{
+		case PlayerType::Gamer1:
+			player_2 = new PlayerGamer1();
+			break;
+		case PlayerType::Gamer2:
+			player_2 = new PlayerGamer2();
+			break;
+		}
+	}
 
 private:
 	void outtextxy_shaded(int x, int y, LPCTSTR str)

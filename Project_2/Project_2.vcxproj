@@ -136,6 +136,9 @@
     <ClInclude Include="gameScene.h" />
     <ClInclude Include="menuScene.h" />
     <ClInclude Include="platform.h" />
+    <ClInclude Include="player.h" />
+    <ClInclude Include="playerGamer1.h" />
+    <ClInclude Include="playerGamer2.h" />
     <ClInclude Include="scene.h" />
     <ClInclude Include="sceneManager.h" />
     <ClInclude Include="selectorScene.h" />

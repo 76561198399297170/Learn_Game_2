@@ -10,6 +10,10 @@
 #include "utils.h"
 #include "platform.h"
 
+#include "player.h"
+#include "playerGamer1.h"
+#include "playerGamer2.h"
+
 #pragma comment(lib, "Winmm.lib")
 
 #include <graphics.h>
@@ -22,6 +26,9 @@ bool is_debug = false;
 Camera main_camera;
 
 std::vector<Platform> platform_list;
+
+Player* player_1 = nullptr;
+Player* player_2 = nullptr;
 
 IMAGE img_menu_background;					//Ö÷²Ëµ¥±³¾°Í¼Æ¬
 
