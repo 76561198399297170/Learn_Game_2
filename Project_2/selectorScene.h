@@ -254,6 +254,7 @@ public:
 			player_1 = new PlayerGamer2();
 			break;
 		}
+		player_1->setId(PlayerId::P1);
 
 		switch (this->m_player_type_2)
 		{
@@ -264,6 +265,7 @@ public:
 			player_2 = new PlayerGamer2();
 			break;
 		}
+		player_2->setId(PlayerId::P2);
 	}
 
 private:

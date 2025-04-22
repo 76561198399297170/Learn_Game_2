@@ -5487,3 +5487,1196 @@ player_2->on_update(delta);
 
 
 
+接下来要实现玩家的移动，所以我们还需要记录玩家的世界坐标，所以在player.h文件中引入vector2.h并在成员变量中创建Vector2变量记录玩家世界坐标位置，为了更好观察画面效果我们可以先添加玩家角色动画相关的定义，引入animation.h头文件并创建四个动画变量，这一部分实现应放在子类中按不同状况进行实例我们稍后完成。
+
+```
+//player.h文件引入头文件
+#include "vector2.h"
+#include "animation.h"
+
+//player.h文件Player类内创建私有成员变量
+private:
+	Vector2 m_position;
+
+	Animation m_animation_idle_left;
+	Animation m_animation_idle_right;
+	Animation m_animation_run_left;
+	Animation m_animation_run_right;
+	
+
+```
+
+还有什么共同内容可以在基类中完成呢？显然读取玩家按键操作将按键消息映射到对应逻辑这一部分代码，不过这也引出新的问题，玩家类型可以通过类继承进行区别，那么与玩家键位控制相关的玩家序号该如何编写呢，实我们决定将玩家序号作为玩家对象一个成员只需要在按键操作时根据序号执行不同逻辑即可。
+
+所以接下来创建playerId.h头文件，随后定义枚举类枚举id类型以P1与P2来确定玩家Id类型：
+
+```
+#ifndef _PLAYERID_H_
+#define _PLAYERID_H_
+
+enum class PlayerId
+{
+	P1,
+	P2
+};
+
+#endif
+```
+
+接下来回到player.h文件中引入playerId.h头文件，并在Player类中声明私有成员变量PlayerId类并提供setId方法，接下来来到selectorScene.h中引入playerId.h头文件并在on_exit方法中分别为其id赋值，随后回到player.h中在类内减价按键是否按下的相关布尔类型变量，然后便可以在on_input中编写相关按键按下的处理方法，需要注意嵌套switch的顺序，由于整个程序在同一台主机上运行所以整个按键消息是共享的所以必须使用id进行区分响应玩家的按键消息，最后通过on_update中做差的方式判断当前移动方向并在成员变量中添加角色朝向记录其当前的朝向以及当前动画指针，这样就可以在on_update中编辑当玩家是否移动时玩家朝向的变化了，并在最后更新动画，这样就就可以在on_draw中对当前动画进行渲染了，如此我们就可以在更上层也就是gameScene.h中的on_draw方法调用player_1与player_2的渲染方法以及on_input方法了：
+
+```
+//player.h文件添加头文件
+#include "playerId.h"
+
+//player.h文件Player类内提供设置函数
+void setId(PlayerId id) { this->m_id = id; }
+
+//player.h文件Player类内添加变量
+PlayerId m_id;
+
+//selectorScene.h文件添加头文件
+#include "playerId.h"
+
+//selectorScene.h成员函数on_exit中添加
+player_1->setId(PlayerId::P1);
+player_2->setId(PlayerId::P2);
+
+//player.h类内成员变量
+bool is_left_keydown = false;
+bool is_right_keydown = false;
+
+//player.h类内成员on_input函数
+switch (msg.message)
+{
+case WM_KEYDOWN:
+	switch (this->m_id)
+	{
+	case PlayerId::P1:
+		switch (msg.vkcode)
+		{
+		case 0x41://'A'
+			this->is_left_keydown = true;
+			break;
+		case 0x44://'D'
+			this->is_right_keydown = true;
+			break;
+		}
+		break;
+	case PlayerId::P2:
+		switch (msg.vkcode)
+		{
+		case VK_LEFT://'←'
+			this->is_left_keydown = true;
+			break;
+		case VK_RIGHT://'→'
+			this->is_right_keydown = true;
+			break;
+		}
+		break;
+	}
+	break;
+case WM_KEYUP:
+	switch (this->m_id)
+	{
+	case PlayerId::P1:
+		switch (msg.vkcode)
+		{
+		case 0x41://'A'
+			this->is_left_keydown = false;
+			break;
+		case 0x44://'D'
+			this->is_right_keydown = false;
+			break;
+		}
+		break;
+	case PlayerId::P2:
+		switch (msg.vkcode)
+		{
+		case VK_LEFT://'←'
+			this->is_left_keydown = false;
+			break;
+		case VK_RIGHT://'→'
+			this->is_right_keydown = false;
+			break;
+		}
+		break;
+	}
+	break;
+}
+
+//player.h中成员变量声明
+bool is_facing_right = true;
+
+Animation* m_current_animaiton = nullptr;
+
+//player.h中on_update方法
+int direction = this->is_right_keydown - this->is_left_keydown;
+
+if (direction != 0)
+{
+	this->is_facing_right = direction > 0;
+	this->m_current_animaiton = is_facing_right ? &this->m_animation_run_right : &this->m_animation_run_left;
+}
+else
+{
+	this->m_current_animaiton = is_facing_right ? &this->m_animation_idle_right : &this->m_animation_idle_left;
+}
+
+this->m_current_animaiton->on_update(delta);
+
+//player.h中on_draw渲染
+this->m_current_animaiton->on_draw(camera, this->m_position.m_x, this->m_position.m_y);
+
+//gameScene.h中on_draw渲染
+player_1->on_draw(camera);
+player_2->on_draw(camera);
+
+//gameScene.h中on_input渲染
+player_1->on_input(msg);
+player_2->on_input(msg);
+```
+
+
+
+接下来开始着手填充子类的实现，首先来到playerGamer1.h中使用extern将所需资源引入，随后在无参构造中初始化资源，不过会发现this指针找不到Animation的几个变量，只需要将Player中成员变量类型转为protected即可，随后在playerGamer2.h中做相同操作：
+
+```
+//playerGamer1.h全局资源引入
+extern Atlas atlas_gamer1_idle_left;
+extern Atlas atlas_gamer1_idle_right;
+extern Atlas atlas_gamer1_run_left;
+extern Atlas atlas_gamer1_run_right;
+
+//player.h中成员变量类型由private改为protected
+protected:
+
+//playerGamer1.h无参构造方法
+this->m_animation_idle_left.setAtlas(&atlas_gamer1_idle_left);
+this->m_animation_idle_right.setAtlas(&atlas_gamer1_idle_right);
+this->m_animation_run_left.setAtlas(&atlas_gamer1_run_left);
+this->m_animation_run_right.setAtlas(&atlas_gamer1_run_right);
+
+this->m_animation_idle_left.setInterval(75);
+this->m_animation_idle_right.setInterval(75);
+this->m_animation_run_left.setInterval(75);
+this->m_animation_run_right.setInterval(75);
+
+//playerGamer2.h全局资源引入
+extern Atlas atlas_gamer2_idle_left;
+extern Atlas atlas_gamer2_idle_right;
+extern Atlas atlas_gamer2_run_left;
+extern Atlas atlas_gamer2_run_right;
+
+//playerGamer2.h无参构造方法
+this->m_animation_idle_left.setAtlas(&atlas_gamer2_idle_left);
+this->m_animation_idle_right.setAtlas(&atlas_gamer2_idle_right);
+this->m_animation_run_left.setAtlas(&atlas_gamer2_run_left);
+this->m_animation_run_right.setAtlas(&atlas_gamer2_run_right);
+
+this->m_animation_idle_left.setInterval(75);
+this->m_animation_idle_right.setInterval(75);
+this->m_animation_run_left.setInterval(75);
+this->m_animation_run_right.setInterval(75);
+```
+
+
+
+运行程序，我们会发现程序出现了错误在on_draw处，这里就体现了层层调试的必要性了，在Animation类完成时测试结果无误，而在此时出现问题说明只有可能是Player类中出现了问题，也就是m_current_animation指针本身，追根溯源我们可以发现，从该开始我们并未对其进行赋值，其初始状态为nullptr所以绘制时导致空指针出现了错误，那么我们只需要在Player类内的无参构造方法中添加初始化代码即可。
+
+运行程序P1与P2都挤在左上角，原位并未对其坐标进行初始化，所以在Player类内提供setPosition方法设置坐标，随后在gameScene.h的on_enter中初始化其坐标，但由于子类重写了父类的on_update方法而动画更新写在了基类on_update中，所以只需要在子类调用父类的on_update方法即可，运行程序角色正确进行渲染且按下左右按键可以正确转向即完成本课程内容：
+
+```
+//player.h无参构造函数初始化
+this->m_current_animaiton = &this->m_animation_idle_right;
+
+//player.h提供设置坐标方法
+void setPosition(int x, int y) { this->m_position.m_x = x, this->m_position.m_y = y; }
+
+//gameScene.h文件on_enter中初始化坐标
+player_1->setPosition(200, 50);
+player_2->setPosition(975, 50);
+
+//playerGame1.h文件中on_update添加
+Player::on_update(delta);
+
+//playerGame2.h文件中on_update添加
+Player::on_update(delta);
+
+```
+
+
+
+## 第九节完成代码展示
+
+**main.cpp**
+
+```
+#include "atlas.h"
+#include "camera.h"
+
+#include "scene.h"
+#include "sceneManager.h"
+#include "menuScene.h"
+#include "gameScene.h"
+#include "selectorScene.h"
+
+#include "utils.h"
+#include "platform.h"
+
+#include "player.h"
+#include "playerGamer1.h"
+#include "playerGamer2.h"
+
+#pragma comment(lib, "Winmm.lib")
+
+#include <graphics.h>
+#include <vector>
+
+const int FPS = 60;
+
+bool is_debug = false;
+
+Camera main_camera;
+
+std::vector<Platform> platform_list;
+
+Player* player_1 = nullptr;
+Player* player_2 = nullptr;
+
+IMAGE img_menu_background;					//主菜单背景图片
+
+IMAGE img_VS;								//VS 艺术字图片
+IMAGE img_1P;								//1P 文本图片
+IMAGE img_2P;								//2P 文本图片
+IMAGE img_1P_desc;							//1P 键位描述图片
+IMAGE img_2P_desc;							//2P 键位描述图片
+IMAGE img_select_background_left;			//选人朝左背景图片
+IMAGE img_select_background_right;			//选人朝右背景图片
+IMAGE img_selector_tip;						//选人界面提示信息
+IMAGE img_selector_background;				//选人界面背景图
+IMAGE img_1P_selector_btn_idle_left;		//1P 向左选择按钮默认状态图片
+IMAGE img_1P_selector_btn_idle_right;		//1P 向右选择按钮默认状态图片
+IMAGE img_1P_selector_btn_down_left;		//1P 向左选择按钮按下状态图片
+IMAGE img_1P_selector_btn_down_right;		//1P 向右选择按钮按下状态图片
+IMAGE img_2P_selector_btn_idle_left;		//2P 向左选择按钮默认状态图片
+IMAGE img_2P_selector_btn_idle_right;		//2P 向右选择按钮默认状态图片
+IMAGE img_2P_selector_btn_down_left;		//2P 向左选择按钮按下状态图片
+IMAGE img_2P_selector_btn_down_right;		//2P 向右选择按钮按下状态图片
+IMAGE img_gamer1_selector_background_left;	//选人界面类型1朝左背景图片
+IMAGE img_gamer1_selector_background_right;	//选人界面类型1朝右背景图片
+IMAGE img_gamer2_selector_background_left;	//选人界面类型2朝左背景图片
+IMAGE img_gamer2_selector_background_right;	//选人界面类型2朝右背景图片
+
+IMAGE img_sky;								//填空图片
+IMAGE img_hills;							//山脉图片
+IMAGE img_platform_large;					//大型平台图片
+IMAGE img_platform_small;					//小型平台图片
+
+IMAGE img_1P_cursor;						//1P 指示光标图片
+IMAGE img_2P_cursor;						//2P 指示光标图片
+
+Atlas atlas_gamer1_idle_left;				//类型1向左默认动画图集
+Atlas atlas_gamer1_idle_right;				//类型1向右默认动画图集
+Atlas atlas_gamer1_run_left;				//类型1向左奔跑动画图集
+Atlas atlas_gamer1_run_right;				//类型1向右奔跑动画图集
+Atlas atlas_gamer1_attack_ex_left;			//类型1向左特殊攻击动画图集
+Atlas atlas_gamer1_attack_ex_right;			//类型1向右特殊攻击动画图集
+Atlas atlas_gamer1_die_left;				//类型1向左死亡动画图集
+Atlas atlas_gamer1_die_right;				//类型1向右死亡动画图集
+
+Atlas atlas_gamer2_idle_left;				//类型2向左默认动画图集
+Atlas atlas_gamer2_idle_right;				//类型2向右默认动画图集
+Atlas atlas_gamer2_run_left;				//类型2向左奔跑动画图集
+Atlas atlas_gamer2_run_right;				//类型2向右奔跑动画图集
+Atlas atlas_gamer2_attack_ex_left;			//类型2向左特殊攻击动画图集
+Atlas atlas_gamer2_attack_ex_right;			//类型2向右特殊攻击动画图集
+Atlas atlas_gamer2_die_left;				//类型2向左死亡动画图集
+Atlas atlas_gamer2_die_right;				//类型2向右死亡动画图集
+
+IMAGE img_gamer1_bullet;					//类型1子弹图片
+Atlas atlas_gamer1_bullet_break;			//类型1子弹破碎动画图集
+Atlas atlas_gemer2_bullet;					//类型2子弹动画图集
+Atlas atlas_gemer2_bullet_explode;			//类型2子弹爆炸动画图集
+Atlas atlas_gamer2_bullet_ex;				//类型2特殊类型子弹动画图集
+Atlas atlas_gamer2_bullet_ex_explode;		//类型2特殊类型子弹爆炸动画图集
+Atlas atlas_gamer2_bullet_text;				//类型2特殊类型子弹爆炸文本动画图集
+
+Atlas atlas_run_effect;						//奔跑特效动画图集
+Atlas atlas_jump_effect;					//跳跃特效动画图集
+Atlas atlas_land_effect;					//落地特效动画图集
+
+IMAGE img_winner_bar;						//获胜玩家背景图片
+IMAGE img_1P_winner;						//1P 获胜文本图片
+IMAGE img_2P_winner;						//2P 获胜文本图片
+
+IMAGE img_avatar_gamer1;					//类型1头像图片
+IMAGE img_avatar_gamer2;					//类型2头像图片
+
+Scene* menu_scene = nullptr;
+Scene* game_scene = nullptr;
+Scene* selector_scene = nullptr;
+
+SceneManager scene_manager;
+
+void flipAtlas(Atlas& src, Atlas& dst)
+{
+	dst.clear();
+	for (int i = 0; i < src.getSize(); i++)
+	{
+		IMAGE img_flpipped;
+		flipImage(src.getImage(i), &img_flpipped);
+		dst.addImage(img_flpipped);
+	}
+}
+
+void loadGameResources()
+{
+	AddFontResourceEx(L"./resources/HYPixel11pxU-2.ttf", FR_PRIVATE, NULL);
+
+	loadimage(&img_menu_background, L"./resources/menu_background.png");
+
+	loadimage(&img_VS, L"./resources/VS.png");
+	loadimage(&img_1P, L"./resources/1P.png");
+	loadimage(&img_2P, L"./resources/2P.png");
+	loadimage(&img_1P_desc, L"./resources/1P_desc.png");
+	loadimage(&img_2P_desc, L"./resources/2P_desc.png");
+	loadimage(&img_select_background_right, L"./resources/select_background.png");
+	flipImage(&img_select_background_right, &img_select_background_left);
+	loadimage(&img_selector_tip, L"./resources/selector_tip.png");
+	loadimage(&img_selector_background, L"./resources/selector_background.png");
+	loadimage(&img_1P_selector_btn_idle_right, L"./resources/1P_selector_btn_idle.png");
+	flipImage(&img_1P_selector_btn_idle_right, &img_1P_selector_btn_idle_left);
+	loadimage(&img_1P_selector_btn_down_right, L"./resources/1P_selector_btn_down.png");
+	flipImage(&img_1P_selector_btn_down_right, &img_1P_selector_btn_down_left);
+	loadimage(&img_2P_selector_btn_idle_right, L"./resources/2P_selector_btn_idle.png");
+	flipImage(&img_2P_selector_btn_idle_right, &img_2P_selector_btn_idle_left);
+	loadimage(&img_2P_selector_btn_down_right, L"./resources/2P_selector_btn_down.png");
+	flipImage(&img_2P_selector_btn_down_right, &img_2P_selector_btn_down_left);
+	loadimage(&img_gamer1_selector_background_right, L"./resources/gamer1_selector_background.png");
+	flipImage(&img_gamer1_selector_background_right, &img_gamer1_selector_background_left);
+	loadimage(&img_gamer2_selector_background_right, L"./resources/gamer2_selector_background.png");
+	flipImage(&img_gamer2_selector_background_right, &img_gamer2_selector_background_left);
+
+	loadimage(&img_sky, L"./resources/sky.png");
+	loadimage(&img_hills, L"./resources/hills.png");
+	loadimage(&img_platform_large, L"./resources/platform_large.png");
+	loadimage(&img_platform_small, L"./resources/platform_small.png");
+
+	loadimage(&img_1P_cursor, L"./resources/1P_cursor.png");
+	loadimage(&img_2P_cursor, L"./resources/2P_cursor.png");
+
+	atlas_gamer1_idle_right.loadFromFile(L"./resources/gamer1_idle_%d.png", 9);
+	flipAtlas(atlas_gamer1_idle_right, atlas_gamer1_idle_left);
+	atlas_gamer1_run_right.loadFromFile(L"./resources/gamer1_run_%d.png", 5);
+	flipAtlas(atlas_gamer1_run_right, atlas_gamer1_run_left);
+	atlas_gamer1_attack_ex_right.loadFromFile(L"./resources/gamer1_attack_ex_%d.png", 3);
+	flipAtlas(atlas_gamer1_attack_ex_right, atlas_gamer1_attack_ex_left);
+	atlas_gamer1_die_right.loadFromFile(L"./resources/gamer1_die_%d.png", 4);
+	flipAtlas(atlas_gamer1_die_right, atlas_gamer1_die_left);
+
+	atlas_gamer2_idle_right.loadFromFile(L"./resources/gamer2_idle_%d.png", 8);
+	flipAtlas(atlas_gamer2_idle_right, atlas_gamer2_idle_left);
+	atlas_gamer2_run_right.loadFromFile(L"./resources/gamer2_run_%d.png", 5);
+	flipAtlas(atlas_gamer2_run_right, atlas_gamer2_run_left);
+	atlas_gamer2_attack_ex_right.loadFromFile(L"./resources/gamer2_attack_ex_%d.png", 9);
+	flipAtlas(atlas_gamer2_attack_ex_right, atlas_gamer2_attack_ex_left);
+	atlas_gamer2_die_right.loadFromFile(L"./resources/gamer2_die_%d.png", 2);
+	flipAtlas(atlas_gamer2_die_right, atlas_gamer2_die_left);
+
+	loadimage(&img_gamer1_bullet, L"./resources/gamer_bullet.png");
+	atlas_gamer1_bullet_break.loadFromFile(L"./resources/gamer1_bullet_break_%d.png", 3);
+	atlas_gemer2_bullet.loadFromFile(L"./resources/gamer2_bullet_%d.png", 5);
+	atlas_gemer2_bullet_explode.loadFromFile(L"./resources/gamer2_bullet_explode_%d.png", 5);
+	atlas_gamer2_bullet_ex.loadFromFile(L"./resources/gamer2_bullet_ex_%d.png", 5);
+	atlas_gamer2_bullet_ex_explode.loadFromFile(L"./resources/gamer2_bullet_ex_explode_%d.png", 5);
+	atlas_gamer2_bullet_text.loadFromFile(L"./resources/gamer2_bullet_text_%d.png", 6);
+
+	atlas_run_effect.loadFromFile(L"./resources/run_effect_%d.png", 4);
+	atlas_jump_effect.loadFromFile(L"./resources/jump_effect_%d.png", 5);
+	atlas_land_effect.loadFromFile(L"./resources/land_effect_%d.png", 2);
+
+	loadimage(&img_1P_winner, L"./resources/1P_winner.png");
+	loadimage(&img_2P_winner, L"./resources/2P_winner.png");
+	loadimage(&img_winner_bar, L"./resources/winner_bar.png");
+
+	loadimage(&img_avatar_gamer1, L"./resources/avatar_gamer1.png");
+	loadimage(&img_avatar_gamer2, L"./resources/avatar_gamer2.png");
+
+	mciSendString(L"open ./resources/bgm_game.mp3 alias bgm_game", NULL, 0, NULL);
+	mciSendString(L"open ./resources/bgm_menu.mp3 alias bgm_menu", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer1_bullet_break_1.mp3 alias gamer1_bullet_break_1", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer1_bullet_break_2.mp3 alias gamer1_bullet_break_2", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer1_bullet_break_3.mp3 alias gamer1_bullet_break_3", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer1_bullet_shoot_1.mp3 alias gamer1_bullet_shoot_1", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer1_bullet_shoot_2.mp3 alias gamer1_bullet_shoot_2", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer1_bullet_shoot_ex.mp3 alias gamer1_bullet_shoot_ex", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer2_bullet_explode.mp3 alias gamer2_bullet_explode", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer2_bullet_explode_ex.mp3 alias gamer2_bullet_explode_ex", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer2_bullet_text.mp3 alias gamer2_bullet_text", NULL, 0, NULL);
+	mciSendString(L"open ./resources/ui_confirm.wav alias ui_confirm", NULL, 0, NULL);
+	mciSendString(L"open ./resources/ui_switch.wav alias ui_switch", NULL, 0, NULL);
+	mciSendString(L"open ./resources/ui_win.wav alias ui_win", NULL, 0, NULL);
+
+	return;
+}
+
+int main()
+{
+	ExMessage msg;
+
+	loadGameResources();
+	
+	initgraph(1200, 720);
+
+	menu_scene = new MenuScene();
+	game_scene = new GameScene();
+	selector_scene = new SelectorScene();
+
+	scene_manager.setCurrentState(menu_scene);
+
+	settextstyle(28, 0, L"HYPixel11pxU-2.ttf");
+	setbkmode(TRANSPARENT);
+
+	BeginBatchDraw();
+	while (true)
+	{
+		DWORD frame_start_time = GetTickCount();
+
+		while (peekmessage(&msg))
+		{
+			scene_manager.on_input(msg);
+		}
+
+		static DWORD last_tick_time = GetTickCount();
+		DWORD current_tick_time = GetTickCount();
+		DWORD delta_tick_time = current_tick_time - last_tick_time;
+		scene_manager.on_updata(delta_tick_time);
+		last_tick_time = current_tick_time;
+
+		cleardevice();
+		scene_manager.on_draw(main_camera);
+
+		FlushBatchDraw();
+
+		DWORD frame_end_time = GetTickCount();
+		DWORD frame_delta_time = frame_end_time - frame_start_time;
+		if (frame_delta_time < 1000 / FPS)
+		{
+			Sleep(1000 / FPS - frame_delta_time);
+		}
+
+	}
+	EndBatchDraw();
+
+	return 0;
+}
+```
+
+**player.h**
+
+```
+#ifndef _PLAYER_H_
+#define _PLAYER_H_
+
+#include "camera.h"
+#include "vector2.h"
+#include "animation.h"
+#include "playerId.h"
+
+#include <graphics.h>
+
+class Player
+{
+public:
+	Player()
+	{
+		this->m_current_animaiton = &this->m_animation_idle_right;
+	}
+
+	~Player() = default;
+
+	virtual void on_update(int delta)
+	{
+		int direction = this->is_right_keydown - this->is_left_keydown;
+
+		if (direction != 0)
+		{
+			this->is_facing_right = direction > 0;
+			this->m_current_animaiton = is_facing_right ? &this->m_animation_run_right : &this->m_animation_run_left;
+		}
+		else
+		{
+			this->m_current_animaiton = is_facing_right ? &this->m_animation_idle_right : &this->m_animation_idle_left;
+		}
+
+		this->m_current_animaiton->on_update(delta);
+	}
+
+	virtual void on_draw(const Camera& camera)
+	{
+		this->m_current_animaiton->on_draw(camera, this->m_position.m_x, this->m_position.m_y);
+	}
+
+	virtual void on_input(const ExMessage& msg)
+	{
+		switch (msg.message)
+		{
+		case WM_KEYDOWN:
+			switch (this->m_id)
+			{
+			case PlayerId::P1:
+				switch (msg.vkcode)
+				{
+				case 0x41://'A'
+					this->is_left_keydown = true;
+					break;
+				case 0x44://'D'
+					this->is_right_keydown = true;
+					break;
+				}
+				break;
+			case PlayerId::P2:
+				switch (msg.vkcode)
+				{
+				case VK_LEFT://'←'
+					this->is_left_keydown = true;
+					break;
+				case VK_RIGHT://'→'
+					this->is_right_keydown = true;
+					break;
+				}
+				break;
+			}
+			break;
+		case WM_KEYUP:
+			switch (this->m_id)
+			{
+			case PlayerId::P1:
+				switch (msg.vkcode)
+				{
+				case 0x41://'A'
+					this->is_left_keydown = false;
+					break;
+				case 0x44://'D'
+					this->is_right_keydown = false;
+					break;
+				}
+				break;
+			case PlayerId::P2:
+				switch (msg.vkcode)
+				{
+				case VK_LEFT://'←'
+					this->is_left_keydown = false;
+					break;
+				case VK_RIGHT://'→'
+					this->is_right_keydown = false;
+					break;
+				}
+				break;
+			}
+			break;
+		}
+	}
+
+	void setId(PlayerId id) { this->m_id = id; }
+
+	void setPosition(int x, int y) { this->m_position.m_x = x, this->m_position.m_y = y; }
+
+protected:
+	Vector2 m_position;
+
+	Animation m_animation_idle_left;
+	Animation m_animation_idle_right;
+	Animation m_animation_run_left;
+	Animation m_animation_run_right;
+
+	Animation* m_current_animaiton = nullptr;
+
+	PlayerId m_id;
+
+	bool is_left_keydown = false;
+	bool is_right_keydown = false;
+
+	bool is_facing_right = true;
+
+};
+
+
+#endif // !_PLAYER_H_
+
+```
+
+**playerGamer1.h**
+
+```
+#ifndef _PLAYERGAMER1_H_
+#define _PLAYERGAMER1_H_
+
+#include "player.h"
+
+#include <iostream>
+
+extern Atlas atlas_gamer1_idle_left;
+extern Atlas atlas_gamer1_idle_right;
+extern Atlas atlas_gamer1_run_left;
+extern Atlas atlas_gamer1_run_right;
+
+class PlayerGamer1 : public Player
+{
+public:
+	PlayerGamer1()
+	{
+		this->m_animation_idle_left.setAtlas(&atlas_gamer1_idle_left);
+		this->m_animation_idle_right.setAtlas(&atlas_gamer1_idle_right);
+		this->m_animation_run_left.setAtlas(&atlas_gamer1_run_left);
+		this->m_animation_run_right.setAtlas(&atlas_gamer1_run_right);
+
+		this->m_animation_idle_left.setInterval(75);
+		this->m_animation_idle_right.setInterval(75);
+		this->m_animation_run_left.setInterval(75);
+		this->m_animation_run_right.setInterval(75);
+	}
+
+	~PlayerGamer1() = default;
+
+	virtual void on_update(int delta)
+	{
+		Player::on_update(delta);
+		std::cout << "Gamer1 on update..." << std::endl;
+	}
+
+};
+
+#endif // !_PLAYERGAMER1_H_
+
+```
+
+**playerGamer2.h**
+
+```
+#ifndef _PLAYERGAMER2_H_
+#define _PLAYERGAMER2_H_
+
+#include "player.h"
+
+#include <iostream>
+
+extern Atlas atlas_gamer2_idle_left;
+extern Atlas atlas_gamer2_idle_right;
+extern Atlas atlas_gamer2_run_left;
+extern Atlas atlas_gamer2_run_right;
+
+class PlayerGamer2 : public Player
+{
+public:
+	PlayerGamer2()
+	{
+		this->m_animation_idle_left.setAtlas(&atlas_gamer2_idle_left);
+		this->m_animation_idle_right.setAtlas(&atlas_gamer2_idle_right);
+		this->m_animation_run_left.setAtlas(&atlas_gamer2_run_left);
+		this->m_animation_run_right.setAtlas(&atlas_gamer2_run_right);
+
+		this->m_animation_idle_left.setInterval(75);
+		this->m_animation_idle_right.setInterval(75);
+		this->m_animation_run_left.setInterval(75);
+		this->m_animation_run_right.setInterval(75);
+	}
+
+	~PlayerGamer2() = default;
+
+	virtual void on_update(int delta)
+	{
+		Player::on_update(delta);
+		std::cout << "Gamer2 on update..." << std::endl;
+	}
+
+};
+
+#endif // !_PLAYERGAMER2_H_
+```
+
+**playerId.h**
+
+```
+#ifndef _PLAYERID_H_
+#define _PLAYERID_H_
+
+enum class PlayerId
+{
+	P1,
+	P2
+};
+
+#endif
+
+```
+
+**gameScene.h**
+
+```
+#ifndef _GAME_SCENE_H_
+#define _GAME_SCENE_H_
+
+#include "utils.h"
+#include "platform.h"
+#include "scene.h"
+#include "sceneManager.h"
+#include "player.h"
+
+#include <iostream>
+
+extern Player* player_1;
+extern Player* player_2;
+
+extern IMAGE img_sky;
+extern IMAGE img_hills;
+extern IMAGE img_platform_large;
+extern IMAGE img_platform_small;
+
+extern Camera main_camera;
+
+extern std::vector<Platform> platform_list;
+
+extern SceneManager scene_manager;
+
+class GameScene : public Scene
+{
+public:
+	GameScene() = default;
+	~GameScene() = default;
+
+	virtual void on_enter()
+	{
+		player_1->setPosition(200, 50);
+		player_2->setPosition(975, 50);
+
+		this->pos_img_sky.x = (getwidth() - img_sky.getwidth()) / 2;
+		this->pos_img_sky.y = (getheight() - img_sky.getheight()) / 2;
+
+		this->pos_img_hills.x = (getwidth() - img_hills.getwidth()) / 2;
+		this->pos_img_hills.y = (getheight() - img_hills.getheight()) / 2;
+
+		platform_list.resize(4);
+		Platform& large_platform = platform_list[0];
+		large_platform.m_img = &img_platform_large;
+		large_platform.m_render_position.x = 122;
+		large_platform.m_render_position.y = 455;
+		large_platform.m_shape.left = (float)large_platform.m_render_position.x + 30;
+		large_platform.m_shape.right = (float)large_platform.m_render_position.x + img_platform_large.getwidth() - 30;
+		large_platform.m_shape.y = (float)large_platform.m_render_position.y + 60;
+
+		Platform& small_platform_1 = platform_list[1];
+		small_platform_1.m_img = &img_platform_small;
+		small_platform_1.m_render_position.x = 175;
+		small_platform_1.m_render_position.y = 360;
+		small_platform_1.m_shape.left = (float)small_platform_1.m_render_position.x + 40;
+		small_platform_1.m_shape.right = (float)small_platform_1.m_render_position.x + img_platform_small.getwidth() - 40;
+		small_platform_1.m_shape.y = (float)small_platform_1.m_render_position.y + img_platform_small.getheight() / 2;
+
+		Platform& small_platform_2 = platform_list[2];
+		small_platform_2.m_img = &img_platform_small;
+		small_platform_2.m_render_position.x = 855;
+		small_platform_2.m_render_position.y = 360;
+		small_platform_2.m_shape.left = (float)small_platform_2.m_render_position.x + 40;
+		small_platform_2.m_shape.right = (float)small_platform_2.m_render_position.x + img_platform_small.getwidth() - 40;
+		small_platform_2.m_shape.y = (float)small_platform_2.m_render_position.y + img_platform_small.getheight() / 2;
+
+		Platform& small_platform_3 = platform_list[3];
+		small_platform_3.m_img = &img_platform_small;
+		small_platform_3.m_render_position.x = 515;
+		small_platform_3.m_render_position.y = 255;
+		small_platform_3.m_shape.left = (float)small_platform_3.m_render_position.x + 40;
+		small_platform_3.m_shape.right = (float)small_platform_3.m_render_position.x + img_platform_small.getwidth() - 40;
+		small_platform_3.m_shape.y = (float)small_platform_3.m_render_position.y + img_platform_small.getheight() / 2;
+
+	}
+
+	virtual void on_update(int delta)
+	{
+		player_1->on_update(delta);
+		player_2->on_update(delta);
+	}
+
+	virtual void on_draw(const Camera& camera) 
+	{
+		putImageAlpha(camera, this->pos_img_sky.x, this->pos_img_sky.y, &img_sky);
+		putImageAlpha(camera, this->pos_img_hills.x, this->pos_img_hills.y, &img_hills);
+
+		for (const Platform& p : platform_list)
+		{
+			p.on_draw(camera);
+		}
+
+		player_1->on_draw(camera);
+		player_2->on_draw(camera);
+	}
+
+	virtual void on_input(const ExMessage& msg)
+	{
+		player_1->on_input(msg);
+		player_2->on_input(msg);
+
+		switch (msg.message)
+		{
+		case WM_KEYDOWN:
+			break;
+		case WM_KEYUP:
+			switch (msg.vkcode)
+			{
+			case 0x51://'Q'
+				is_debug = !is_debug;
+				break;
+			default:
+				break;
+			}
+			break;
+		default:
+			break;
+		}
+	}
+
+	virtual void on_exit() {}
+
+private:
+	POINT pos_img_sky = { 0 };
+	POINT pos_img_hills = { 0 };
+
+};
+
+#endif
+```
+
+**selectorScene.h**
+
+```
+#ifndef _SELECTOR_SCENE_H_
+#define _SELECTOR_SCENE_H_
+
+#include "utils.h"
+
+#include "scene.h"
+#include "sceneManager.h"
+
+#include "animation.h"
+
+#include "player.h"
+#include "playerGamer1.h"
+#include "playerGamer2.h"
+
+extern Player* player_1;
+extern Player* player_2;
+
+extern IMAGE img_VS;
+extern IMAGE img_1P;
+extern IMAGE img_2P;
+extern IMAGE img_1P_desc;
+extern IMAGE img_2P_desc;
+extern IMAGE img_select_background_left;
+extern IMAGE img_select_background_right;
+extern IMAGE img_selector_tip;
+extern IMAGE img_selector_background;
+extern IMAGE img_1P_selector_btn_idle_left;
+extern IMAGE img_1P_selector_btn_idle_right;
+extern IMAGE img_1P_selector_btn_down_left;
+extern IMAGE img_1P_selector_btn_down_right;
+extern IMAGE img_2P_selector_btn_idle_left;
+extern IMAGE img_2P_selector_btn_idle_right;
+extern IMAGE img_2P_selector_btn_down_left;
+extern IMAGE img_2P_selector_btn_down_right;
+extern IMAGE img_gamer1_selector_background_left;
+extern IMAGE img_gamer1_selector_background_right;
+extern IMAGE img_gamer2_selector_background_left;
+extern IMAGE img_gamer2_selector_background_right;
+
+extern Atlas atlas_gamer1_idle_right;
+extern Atlas atlas_gamer2_idle_right;
+
+extern IMAGE img_avatar_gamer1;
+extern IMAGE img_avatar_gamer2;
+
+extern SceneManager scene_manager;
+
+class SelectorScene : public Scene
+{
+public:
+	SelectorScene() = default;
+	~SelectorScene() = default;
+
+	virtual void on_enter() 
+	{
+		this->m_animation_gamer1.setAtlas(&atlas_gamer1_idle_right);
+		this->m_animation_gamer2.setAtlas(&atlas_gamer2_idle_right);
+		this->m_animation_gamer1.setInterval(100);
+		this->m_animation_gamer2.setInterval(100);
+
+		static const int OFFSET_X = 50;
+
+		this->pos_img_VS.x = (getwidth() - img_VS.getwidth()) / 2;
+		this->pos_img_VS.y = (getheight() - img_VS.getheight()) / 2;
+		this->pos_img_tip.x = (getwidth() - img_selector_tip.getwidth()) / 2;
+		this->pos_img_tip.y = getheight() - 125;
+		this->pos_img_1P.x = (getwidth() / 2 - img_1P.getwidth()) / 2 - OFFSET_X;
+		this->pos_img_1P.y = 35;
+		this->pos_img_2P.x = getwidth() / 2 + (getwidth() / 2 - img_2P.getwidth()) / 2 + OFFSET_X;
+		this->pos_img_2P.y = this->pos_img_1P.y;
+		this->pos_img_1P_desc.x = (getwidth() / 2 - img_1P_desc.getwidth()) / 2 - OFFSET_X;
+		this->pos_img_1P_desc.y = getheight() - 150;
+		this->pos_img_2P_desc.x = getwidth() / 2 + (getwidth() / 2 - img_2P_desc.getwidth()) / 2 + OFFSET_X;
+		this->pos_img_2P_desc.y = this->pos_img_1P_desc.y;
+		this->pos_img_1P_select_background.x = (getwidth() / 2 - img_select_background_right.getwidth()) / 2 - OFFSET_X;
+		this->pos_img_1P_select_background.y = this->pos_img_1P.y + img_1P.getwidth() + 35;
+		this->pos_img_2P_select_background.x = getwidth() / 2 + (getwidth() / 2 - img_select_background_left.getwidth()) / 2 + OFFSET_X;
+		this->pos_img_2P_select_background.y = this->pos_img_1P_select_background.y;
+		this->pos_animation_1P.x = (getwidth() / 2 - atlas_gamer1_idle_right.getImage(0)->getwidth()) / 2 - OFFSET_X;
+		this->pos_animation_1P.y = this->pos_img_1P_select_background.y + 80;
+		this->pos_animation_2P.x = getwidth() / 2 + (getwidth() / 2 - atlas_gamer1_idle_right.getImage(0)->getwidth()) / 2 + OFFSET_X;
+		this->pos_animation_2P.y = this->pos_animation_1P.y;
+		this->pos_img_1P_name.y = this->pos_animation_1P.y + 155;
+		this->pos_img_2P_name.y = this->pos_img_1P_name.y;
+		this->pos_1P_selector_btn_left.x = this->pos_img_1P_select_background.x - img_1P_selector_btn_idle_left.getwidth();
+		this->pos_1P_selector_btn_left.y = this->pos_img_1P_select_background.y + (img_select_background_right.getheight() - img_1P_selector_btn_idle_left.getheight()) / 2;
+		this->pos_1P_selector_btn_right.x = this->pos_img_1P_select_background.x + img_select_background_right.getwidth();
+		this->pos_1P_selector_btn_right.y = this->pos_1P_selector_btn_left.y;
+		this->pos_2P_selector_btn_left.x = this->pos_img_2P_select_background.x - img_2P_selector_btn_idle_left.getwidth();
+		this->pos_2P_selector_btn_left.y = this->pos_1P_selector_btn_left.y;
+		this->pos_2P_selector_btn_right.x = this->pos_img_2P_select_background.x + img_select_background_left.getwidth();
+		this->pos_2P_selector_btn_right.y = this->pos_1P_selector_btn_left.y;
+	}
+
+	virtual void on_update(int delta)
+	{
+		this->m_animation_gamer1.on_update(delta);
+		this->m_animation_gamer2.on_update(delta);
+
+		this->m_selector_background_scorll_offset_x += 5;
+		if (this->m_selector_background_scorll_offset_x >= img_gamer1_selector_background_left.getwidth())
+		{
+			this->m_selector_background_scorll_offset_x -= img_gamer1_selector_background_left.getwidth();
+		}
+	}
+
+	virtual void on_draw(const Camera& camera)
+	{
+		IMAGE* imgptr_P1_seletor_background = nullptr;
+		IMAGE* imgptr_P2_seletor_background = nullptr;
+
+		switch (this->m_player_type_1)
+		{
+		case PlayerType::Gamer1:
+			imgptr_P1_seletor_background = &img_gamer1_selector_background_left;
+			break;
+		case PlayerType::Gamer2:
+			imgptr_P1_seletor_background = &img_gamer2_selector_background_left;
+			break;
+		default:
+			imgptr_P1_seletor_background = &img_gamer1_selector_background_left;
+			break;
+		}
+
+		switch (this->m_player_type_2)
+		{
+		case PlayerType::Gamer1:
+			imgptr_P2_seletor_background = &img_gamer1_selector_background_left;
+			break;
+		case PlayerType::Gamer2:
+			imgptr_P2_seletor_background = &img_gamer2_selector_background_left;
+			break;
+		default:
+			imgptr_P2_seletor_background = &img_gamer1_selector_background_left;
+			break;
+		}
+
+		putimage(0, 0, &img_selector_background);
+
+		putImageAlpha(this->m_selector_background_scorll_offset_x - imgptr_P1_seletor_background->getwidth(), 0, imgptr_P1_seletor_background);
+		putImageAlpha(this->m_selector_background_scorll_offset_x, 0, imgptr_P1_seletor_background->getwidth() - this->m_selector_background_scorll_offset_x, 0, imgptr_P1_seletor_background, 0, 0);
+		putImageAlpha(getwidth() - this->m_selector_background_scorll_offset_x, 0, imgptr_P2_seletor_background);
+		putImageAlpha(getwidth() - imgptr_P2_seletor_background->getwidth(), 0, imgptr_P2_seletor_background->getwidth() - this->m_selector_background_scorll_offset_x, 0, imgptr_P2_seletor_background, this->m_selector_background_scorll_offset_x, 0);
+
+		putImageAlpha(this->pos_img_VS.x, this->pos_img_VS.y, &img_VS);
+
+		putImageAlpha(this->pos_img_1P.x, this->pos_img_1P.y, &img_1P);
+		putImageAlpha(this->pos_img_2P.x, this->pos_img_2P.y, &img_2P);
+		putImageAlpha(this->pos_img_1P_select_background.x, this->pos_img_1P_select_background.y, &img_select_background_right);
+		putImageAlpha(this->pos_img_2P_select_background.x, this->pos_img_2P_select_background.y, &img_select_background_left);
+
+		switch (this->m_player_type_1)
+		{
+		case PlayerType::Gamer1:
+			this->m_animation_gamer1.on_draw(camera, this->pos_animation_1P.x, this->pos_animation_1P.y);
+			this->pos_img_1P_name.x = this->pos_img_1P_select_background.x + (img_select_background_right.getwidth() - textwidth(this->str_gamer1_name)) / 2;
+			this->outtextxy_shaded(this->pos_img_1P_name.x, this->pos_img_1P_name.y, this->str_gamer1_name);
+			break;
+		case PlayerType::Gamer2:
+			this->m_animation_gamer2.on_draw(camera, this->pos_animation_1P.x, this->pos_animation_1P.y);
+			this->pos_img_1P_name.x = this->pos_img_1P_select_background.x + (img_select_background_right.getwidth() - textwidth(this->str_gamer2_name)) / 2;
+			this->outtextxy_shaded(this->pos_img_1P_name.x, this->pos_img_1P_name.y, this->str_gamer2_name);
+			break;
+		}
+		
+		switch (this->m_player_type_2)
+		{
+		case PlayerType::Gamer1:
+			this->m_animation_gamer1.on_draw(camera, this->pos_animation_2P.x, this->pos_animation_2P.y);
+			this->pos_img_2P_name.x = this->pos_img_2P_select_background.x + (img_select_background_left.getwidth() - textwidth(this->str_gamer1_name)) / 2;
+			this->outtextxy_shaded(this->pos_img_2P_name.x, this->pos_img_2P_name.y, this->str_gamer1_name);
+			break;
+		case PlayerType::Gamer2:
+			this->m_animation_gamer2.on_draw(camera, this->pos_animation_2P.x, this->pos_animation_2P.y);
+			this->pos_img_2P_name.x = this->pos_img_2P_select_background.x + (img_select_background_left.getwidth() - textwidth(this->str_gamer2_name)) / 2;
+			this->outtextxy_shaded(this->pos_img_2P_name.x, this->pos_img_2P_name.y, this->str_gamer2_name);
+			break;
+		}
+
+		putImageAlpha(this->pos_1P_selector_btn_left.x, this->pos_1P_selector_btn_left.y, this->is_btn_1P_left_down ? &img_1P_selector_btn_down_left : &img_1P_selector_btn_idle_left);
+		putImageAlpha(this->pos_1P_selector_btn_right.x, this->pos_1P_selector_btn_right.y, this->is_btn_1P_right_down ? &img_1P_selector_btn_down_right : &img_1P_selector_btn_idle_right);
+		putImageAlpha(this->pos_2P_selector_btn_left.x, this->pos_2P_selector_btn_left.y, this->is_btn_2P_left_down ? &img_2P_selector_btn_down_left : &img_2P_selector_btn_idle_left);
+		putImageAlpha(this->pos_2P_selector_btn_right.x, this->pos_2P_selector_btn_right.y, this->is_btn_2P_right_down ? &img_2P_selector_btn_down_right : &img_2P_selector_btn_idle_right);
+
+		putImageAlpha(this->pos_img_1P_desc.x, this->pos_img_1P_desc.y, &img_1P_desc);
+		putImageAlpha(this->pos_img_2P_desc.x, this->pos_img_2P_desc.y, &img_2P_desc);
+
+		putImageAlpha(this->pos_img_tip.x, this->pos_img_tip.y, &img_selector_tip);
+	}
+
+	virtual void on_input(const ExMessage& msg)
+	{
+		switch (msg.message)
+		{
+		case WM_KEYDOWN:
+			switch (msg.vkcode)
+			{
+			case 0x41://'A'
+				this->is_btn_1P_left_down = true;
+				break;
+			case 0x44://'D'
+				this->is_btn_1P_right_down = true;
+				break;
+			case VK_LEFT://'←'
+				this->is_btn_2P_left_down = true;
+				break;
+			case VK_RIGHT://'→'
+				this->is_btn_2P_right_down = true;
+				break;
+			}
+			break;
+		case WM_KEYUP:
+			switch (msg.vkcode)
+			{
+			case 0x41://'A'
+				this->is_btn_1P_left_down = false;
+				this->m_player_type_1 = (PlayerType)(((int)PlayerType::Invalid + (int)this->m_player_type_1 - 1) % (int)PlayerType::Invalid);
+				mciSendString(L"play ui_switch from 0", NULL, 0, NULL);
+				break;
+			case 0x44://'D'
+				this->is_btn_1P_right_down = false;
+				this->m_player_type_1 = (PlayerType)(((int)this->m_player_type_1 + 1) % (int)PlayerType::Invalid);
+				mciSendString(L"play ui_switch from 0", NULL, 0, NULL);
+				break;
+			case VK_LEFT://'←'
+				this->is_btn_2P_left_down = false;
+				this->m_player_type_2 = (PlayerType)(((int)PlayerType::Invalid + (int)this->m_player_type_2 - 1) % (int)PlayerType::Invalid);
+				mciSendString(L"play ui_switch from 0", NULL, 0, NULL);
+				break;
+			case VK_RIGHT://'→'
+				this->is_btn_2P_right_down = false;
+				this->m_player_type_2 = (PlayerType)(((int)this->m_player_type_2 + 1) % (int)PlayerType::Invalid);
+				mciSendString(L"play ui_switch from 0", NULL, 0, NULL);
+				break;
+			case VK_RETURN:
+				scene_manager.switchTo(SceneManager::SceneType::Game);
+				mciSendString(L"play ui_confirm from 0", NULL, 0, NULL);
+				break;
+			}
+			break;
+		default:
+			break;
+		}
+	}
+
+	virtual void on_exit()
+	{
+		switch (this->m_player_type_1)
+		{
+		case PlayerType::Gamer1:
+			player_1 = new PlayerGamer1();
+			break;
+		case PlayerType::Gamer2:
+			player_1 = new PlayerGamer2();
+			break;
+		}
+		player_1->setId(PlayerId::P1);
+
+		switch (this->m_player_type_2)
+		{
+		case PlayerType::Gamer1:
+			player_2 = new PlayerGamer1();
+			break;
+		case PlayerType::Gamer2:
+			player_2 = new PlayerGamer2();
+			break;
+		}
+		player_2->setId(PlayerId::P2);
+	}
+
+private:
+	void outtextxy_shaded(int x, int y, LPCTSTR str)
+	{
+		settextcolor(RGB(45, 45, 45));
+		outtextxy(x + 3, y + 3, str);
+		settextcolor(RGB(255, 255, 255));
+		outtextxy(x, y, str);
+	}
+
+private:
+	enum class PlayerType
+	{
+		Gamer1,
+		Gamer2,
+		Invalid
+	};
+
+private:
+	bool is_btn_1P_left_down = false;
+	bool is_btn_1P_right_down = false;
+	bool is_btn_2P_left_down = false;
+	bool is_btn_2P_right_down = false;
+
+private:
+	POINT pos_img_VS = { 0 };
+	POINT pos_img_tip = { 0 };
+	POINT pos_img_1P = { 0 };
+	POINT pos_img_2P = { 0 };
+	POINT pos_img_1P_desc = { 0 };
+	POINT pos_img_2P_desc = { 0 };
+	POINT pos_img_1P_name = { 0 };
+	POINT pos_img_2P_name = { 0 };
+	POINT pos_animation_1P = { 0 };
+	POINT pos_animation_2P = { 0 };
+	POINT pos_img_1P_select_background = { 0 };
+	POINT pos_img_2P_select_background = { 0 };
+	POINT pos_1P_selector_btn_left = { 0 };
+	POINT pos_2P_selector_btn_left = { 0 };
+	POINT pos_1P_selector_btn_right = { 0 };
+	POINT pos_2P_selector_btn_right = { 0 };
+
+	Animation m_animation_gamer1;
+	Animation m_animation_gamer2;
+
+	PlayerType m_player_type_1 = PlayerType::Gamer1;
+	PlayerType m_player_type_2 = PlayerType::Gamer2;
+
+	LPCTSTR str_gamer1_name = L" 角色 1 ";
+	LPCTSTR str_gamer2_name = L" 角色 2 ";
+
+	int m_selector_background_scorll_offset_x = 0;
+
+};
+
+#endif
+```
+
+
+
+## 第十节

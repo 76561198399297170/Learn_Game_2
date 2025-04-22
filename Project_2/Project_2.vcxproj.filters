@@ -13,14 +13,14 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="头文件\Scene">
-      <UniqueIdentifier>{0d41b5c7-28df-4763-8249-a39aa96b75dc}</UniqueIdentifier>
-    </Filter>
     <Filter Include="头文件\Manager">
       <UniqueIdentifier>{b8e865e8-d090-4389-90fb-4980c8789e89}</UniqueIdentifier>
     </Filter>
     <Filter Include="头文件\Player">
       <UniqueIdentifier>{153c7230-d01c-4319-a258-244665d045cd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="头文件\Scene">
+      <UniqueIdentifier>{0d41b5c7-28df-4763-8249-a39aa96b75dc}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -72,6 +72,9 @@
       <Filter>头文件\Player</Filter>
     </ClInclude>
     <ClInclude Include="playerGamer2.h">
+      <Filter>头文件\Player</Filter>
+    </ClInclude>
+    <ClInclude Include="playerId.h">
       <Filter>头文件\Player</Filter>
     </ClInclude>
   </ItemGroup>

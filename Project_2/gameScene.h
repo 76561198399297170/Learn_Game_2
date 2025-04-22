@@ -31,6 +31,9 @@ public:
 
 	virtual void on_enter()
 	{
+		player_1->setPosition(200, 50);
+		player_2->setPosition(975, 50);
+
 		this->pos_img_sky.x = (getwidth() - img_sky.getwidth()) / 2;
 		this->pos_img_sky.y = (getheight() - img_sky.getheight()) / 2;
 
@@ -87,10 +90,16 @@ public:
 		{
 			p.on_draw(camera);
 		}
+
+		player_1->on_draw(camera);
+		player_2->on_draw(camera);
 	}
 
 	virtual void on_input(const ExMessage& msg)
 	{
+		player_1->on_input(msg);
+		player_2->on_input(msg);
+
 		switch (msg.message)
 		{
 		case WM_KEYDOWN:
