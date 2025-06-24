@@ -22,6 +22,9 @@
     <Filter Include="头文件\Scene">
       <UniqueIdentifier>{0d41b5c7-28df-4763-8249-a39aa96b75dc}</UniqueIdentifier>
     </Filter>
+    <Filter Include="头文件\bullet">
+      <UniqueIdentifier>{b287339f-5785-4b95-9978-bc95933fc15c}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -76,6 +79,18 @@
     </ClInclude>
     <ClInclude Include="playerId.h">
       <Filter>头文件\Player</Filter>
+    </ClInclude>
+    <ClInclude Include="bullet.h">
+      <Filter>头文件\bullet</Filter>
+    </ClInclude>
+    <ClInclude Include="gamer1Bullet.h">
+      <Filter>头文件\bullet</Filter>
+    </ClInclude>
+    <ClInclude Include="gamer2BulletEx.h">
+      <Filter>头文件\bullet</Filter>
+    </ClInclude>
+    <ClInclude Include="gamer2Bullet.h">
+      <Filter>头文件\bullet</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

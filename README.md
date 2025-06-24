@@ -6680,3 +6680,1385 @@ private:
 
 
 ## 第十节
+
+### 简单物理实现——移动
+
+首先先将上节未完成的部分代码完成，按键按下进行动画的切换的功能已经完成，下一步就是修改角色的坐标来达成移动的效果了，在player.h中的类内添加run_velocity变量表示其水平移动速度，在on_update中将其与时间相乘记为移动距离对坐标进行更新，不过我们希望封装跑步方法使其更加方便进行管理，所以在Player类中定义on_run方法，传入移动距离作为变量在玩家水平位置进行修改，运行程序可以看到角色悬浮空中按下左右键即可左右移动：
+
+```
+//player.h中Player类内成员变量
+const float run_velocity = 0.55f;//水平移动速度
+
+//player.h中Player类内on_update
+if (direction != 0)
+{
+	this->is_facing_right = direction > 0;
+	this->m_current_animaiton = is_facing_right ? &this->m_animation_run_right : &this->m_animation_run_left;
+	//=====修改部分=====
+	float distance = direction * this->run_velocity * delta;
+	this->on_run(distance);
+	//=====修改部分=====
+}
+
+//Player创建on_run
+void on_run(float destance) 
+{
+	this->m_position.m_x += destance;
+}
+
+```
+
+
+
+由于我们的项目中平台类型均为单项碰撞的模式，玩家可以从平台下方越过降落到平台上方但是无法从上方穿越到下方，这一部分依然涉及到一些相对抽象的数据逻辑，我们慢慢来一步一步完成。
+
+
+
+### 简单物理实现——重力模拟
+
+由于整个物理中模拟中重力通常由速度与加速度影响，所以先在Player类中定义gravity常量表示所受重力，需要注意的是在程序中所受重力需要符合直觉，人物身体比例与现实比例不一致所以此处的重力加速度也不一定为9.8可能会小得多，只要看上去符合当前情景的重力的情况即可，同时还需要添加保存速度的变量velocity，随后定义moveAndCollide函数用于处理后续物理相关代码。
+
+首先是根据重力加速度值对玩家速度进行累加，随后根据速度更新玩家位置并在on_update中调用碰撞更新部分，运行程序就可以看到玩家开始进行下落，由此我们可以开始单向碰撞的代码部分了：
+
+```
+//Player类内声明变量
+const float gravity = 0.0016f;//重力加速度
+
+Vector2 m_velocity;
+
+//moveAndCollide代码
+void moveAndCollide(int delta)
+{
+    this->m_velocity.m_y += this->gravity * delta;
+    this->m_position += this->m_velocity * delta;
+}
+
+//on_update最后最后调用moveAndCollide
+this->moveAndCollide(delta);
+
+```
+
+
+
+由于可以从底部穿过平台而无法从顶部落下到底部，所以和平台的碰撞只需要在玩家下坠时也就是速度向下时检测平台即可，并且由于需要获取到场景中所有平台对象，所以在全局区引入platform.h头文件并通过extern获取所有平台列表，这样就可以遍历每一个平台并获取到其碰撞外形了，但是如何定义碰撞呢？
+
+既然已经定义了玩家的位置属性那么只需要添加一个size二维向量描述玩家尺寸即可实现玩家矩形碰撞箱了，而碰撞原理也很好解释，由于是矩形与线的碰撞只需要将二者的右左边界值做差比较即可，如果结果小于二者宽度和则说明有重合部分否者没有重合部分，而竖直方向只需要平台检测线的y坐标处于玩家矩形上边界和下边界之间即可判断了，当水平与竖直均发生碰撞，则我们可以确定二者发生了碰撞。
+
+那么就可以做坐标修正了，如果只是简单的将发生碰撞就将玩家坐标修正到平台上就会出现，明明只是刚刚好头顶碰到平台结果却瞬移到平台上的错误情况，那么如何修正整个方法，只需要获取上一帧玩家脚底位置只有其在平台上方并满足之前所讨论的所有条件，才应该执行坐标修正，同时不要忘记在各自实现中初始化size大小：
+
+```
+//player.h全局区声明引入资源
+#include "platform.h"
+
+extern std::vector<Platform> platform_list;
+
+//Player成员变量添加玩家尺寸
+Vector2 m_size;
+
+//moveAndCollide平台碰撞
+void moveAndCollide(int delta)
+{
+	this->m_velocity.m_y += this->gravity * delta;
+	this->m_position += this->m_velocity * delta;
+
+	if (this->m_velocity.m_y > 0)
+	{
+		for (const Platform& pt : platform_list)
+		{
+			const Platform::CollisionShape& shape = pt.m_shape;
+
+			bool is_collide_x = (max(this->m_position.m_x + this->m_size.m_x, shape.right) - min(this->m_position.m_x, shape.left) <= this->m_size.m_x + (shape.right - shape.left));
+			bool is_collide_y = (shape.y >= this->m_position.m_y && shape.y <= this->m_position.m_y + this->m_size.m_y);
+
+			if (is_collide_x && is_collide_y)
+			{
+				float delta_pos_y = this->m_velocity.m_y * delta;
+				float last_tick_foot_pos_y = this->m_position.m_y + this->m_size.m_y - delta_pos_y;
+				if (last_tick_foot_pos_y <= shape.y)
+				{
+					this->m_position.m_y = shape.y - this->m_size.m_y;
+					this->m_velocity.m_y = 0;
+
+					return;
+				}
+			}
+		}
+	}
+}
+
+//playerGamer1.h中PlayerGamer1构造函数
+this->m_size.m_x = 96;
+this->m_size.m_y = 96;
+
+//playerGamer2.h中PlayerGamer2构造函数
+this->m_size.m_x = 96;
+this->m_size.m_y = 96;
+
+```
+
+
+
+最后是完成跳跃逻辑，在player.h中定义on_jump方法，此时来到on_input中即可在1P按下W时与2P按下↑时调用on_jump方法，接下来即可填充on_jump逻辑。
+
+```
+//on_input中的WM_KEYDOWN中的1P
+case 0x57://'W'
+    this->on_jump();
+    break;
+
+//on_input中的WM_KEYDOWN中的1P
+case VK_UP://↑
+	this->on_jump();
+	break;
+
+```
+
+
+
+首先声明成员变量jump_velocity保存玩家跳跃速度，随后修改on_jump中速度直接增加跳跃速度即可，但是运行会发现，如果玩家疯狂敲击跳跃键则会直接升天，为了避免我们使用速度为0来充当必要条件，只有玩家竖直速度为0时才可以继续执行跳跃逻辑，运行程序正确执行了所需功能逻辑：
+
+```
+//成员变量声明
+const float jump_velocity = -0.85f;//跳跃速度
+
+//on_jump声明
+void on_jump()
+{
+	if (this->m_velocity.m_y != 0) return;
+
+	this->m_velocity.m_y += this->jump_velocity;
+}
+
+```
+
+
+
+## 第十节完成代码展示
+
+**player.h**
+
+```
+#ifndef _PLAYER_H_
+#define _PLAYER_H_
+
+#include "camera.h"
+#include "vector2.h"
+#include "animation.h"
+#include "playerId.h"
+#include "platform.h"
+
+#include <graphics.h>
+
+extern std::vector<Platform> platform_list;
+
+class Player
+{
+public:
+	Player()
+	{
+		this->m_current_animaiton = &this->m_animation_idle_right;
+	}
+
+	~Player() = default;
+
+	virtual void on_update(int delta)
+	{
+		int direction = this->is_right_keydown - this->is_left_keydown;
+
+		if (direction != 0)
+		{
+			this->is_facing_right = direction > 0;
+			this->m_current_animaiton = is_facing_right ? &this->m_animation_run_right : &this->m_animation_run_left;
+			
+			float distance = direction * this->run_velocity * delta;
+			this->on_run(distance);
+
+		}
+		else
+		{
+			this->m_current_animaiton = is_facing_right ? &this->m_animation_idle_right : &this->m_animation_idle_left;
+		}
+
+		this->m_current_animaiton->on_update(delta);
+		this->moveAndCollide(delta);
+	}
+
+	virtual void on_draw(const Camera& camera)
+	{
+		this->m_current_animaiton->on_draw(camera, this->m_position.m_x, this->m_position.m_y);
+	}
+
+	virtual void on_input(const ExMessage& msg)
+	{
+		switch (msg.message)
+		{
+		case WM_KEYDOWN:
+			switch (this->m_id)
+			{
+			case PlayerId::P1:
+				switch (msg.vkcode)
+				{
+				case 0x41://'A'
+					this->is_left_keydown = true;
+					break;
+				case 0x44://'D'
+					this->is_right_keydown = true;
+					break;
+				case 0x57://'W'
+					this->on_jump();
+					break;
+				}
+				break;
+			case PlayerId::P2:
+				switch (msg.vkcode)
+				{
+				case VK_LEFT://'←'
+					this->is_left_keydown = true;
+					break;
+				case VK_RIGHT://'→'
+					this->is_right_keydown = true;
+					break;
+				case VK_UP://'↑'
+					this->on_jump();
+					break;
+				}
+				break;
+			}
+			break;
+		case WM_KEYUP:
+			switch (this->m_id)
+			{
+			case PlayerId::P1:
+				switch (msg.vkcode)
+				{
+				case 0x41://'A'
+					this->is_left_keydown = false;
+					break;
+				case 0x44://'D'
+					this->is_right_keydown = false;
+					break;
+				}
+				break;
+			case PlayerId::P2:
+				switch (msg.vkcode)
+				{
+				case VK_LEFT://'←'
+					this->is_left_keydown = false;
+					break;
+				case VK_RIGHT://'→'
+					this->is_right_keydown = false;
+					break;
+				}
+				break;
+			}
+			break;
+		}
+	}
+
+	void on_jump()
+	{
+		if (this->m_velocity.m_y != 0) return;
+
+		this->m_velocity.m_y += this->jump_velocity;
+	}
+
+	void on_run(float destance) 
+	{
+		this->m_position.m_x += destance;
+	}
+
+	void moveAndCollide(int delta)
+	{
+		this->m_velocity.m_y += this->gravity * delta;
+		this->m_position += this->m_velocity * (float)delta;
+
+		if (this->m_velocity.m_y > 0)
+		{
+			for (const Platform& pt : platform_list)
+			{
+				const Platform::CollisionShape& shape = pt.m_shape;
+
+				bool is_collide_x = (max(this->m_position.m_x + this->m_size.m_x, shape.right) - min(this->m_position.m_x, shape.left) <= this->m_size.m_x + (shape.right - shape.left));
+				bool is_collide_y = (shape.y >= this->m_position.m_y && shape.y <= this->m_position.m_y + this->m_size.m_y);
+
+				if (is_collide_x && is_collide_y)
+				{
+					float delta_pos_y = this->m_velocity.m_y * delta;
+					float last_tick_foot_pos_y = this->m_position.m_y + this->m_size.m_y - delta_pos_y;
+					if (last_tick_foot_pos_y <= shape.y)
+					{
+						this->m_position.m_y = shape.y - this->m_size.m_y;
+						this->m_velocity.m_y = 0;
+
+						break;
+					}
+				}
+			}
+		}
+	}
+
+	void setId(PlayerId id) { this->m_id = id; }
+
+	void setPosition(int x, int y) { this->m_position.m_x = x, this->m_position.m_y = y; }
+
+protected:
+	Vector2 m_size;
+	Vector2 m_position;
+	Vector2 m_velocity;
+
+	Animation m_animation_idle_left;
+	Animation m_animation_idle_right;
+	Animation m_animation_run_left;
+	Animation m_animation_run_right;
+
+	Animation* m_current_animaiton = nullptr;
+
+	PlayerId m_id;
+
+	const float run_velocity = 0.55f;//水平移动速度
+	const float gravity = 0.0016f;//重力加速度
+	const float jump_velocity = -0.85f;//跳跃速度
+
+	bool is_left_keydown = false;
+	bool is_right_keydown = false;
+
+	bool is_facing_right = true;
+
+};
+
+#endif // !_PLAYER_H_
+
+```
+
+**playerGamer1.h**
+
+```
+#ifndef _PLAYERGAMER1_H_
+#define _PLAYERGAMER1_H_
+
+#include "player.h"
+
+#include <iostream>
+
+extern Atlas atlas_gamer1_idle_left;
+extern Atlas atlas_gamer1_idle_right;
+extern Atlas atlas_gamer1_run_left;
+extern Atlas atlas_gamer1_run_right;
+
+class PlayerGamer1 : public Player
+{
+public:
+	PlayerGamer1()
+	{
+		this->m_animation_idle_left.setAtlas(&atlas_gamer1_idle_left);
+		this->m_animation_idle_right.setAtlas(&atlas_gamer1_idle_right);
+		this->m_animation_run_left.setAtlas(&atlas_gamer1_run_left);
+		this->m_animation_run_right.setAtlas(&atlas_gamer1_run_right);
+
+		this->m_animation_idle_left.setInterval(75);
+		this->m_animation_idle_right.setInterval(75);
+		this->m_animation_run_left.setInterval(75);
+		this->m_animation_run_right.setInterval(75);
+
+		this->m_size.m_x = 96;
+		this->m_size.m_y = 96;
+	}
+
+	~PlayerGamer1() = default;
+
+	virtual void on_update(int delta)
+	{
+		Player::on_update(delta);
+		std::cout << "Gamer1 on update..." << std::endl;
+	}
+
+};
+
+#endif // !_PLAYERGAMER1_H_
+
+```
+
+**playerGamer2.h**
+
+```
+#ifndef _PLAYERGAMER2_H_
+#define _PLAYERGAMER2_H_
+
+#include "player.h"
+
+#include <iostream>
+
+extern Atlas atlas_gamer2_idle_left;
+extern Atlas atlas_gamer2_idle_right;
+extern Atlas atlas_gamer2_run_left;
+extern Atlas atlas_gamer2_run_right;
+
+class PlayerGamer2 : public Player
+{
+public:
+	PlayerGamer2()
+	{
+		this->m_animation_idle_left.setAtlas(&atlas_gamer2_idle_left);
+		this->m_animation_idle_right.setAtlas(&atlas_gamer2_idle_right);
+		this->m_animation_run_left.setAtlas(&atlas_gamer2_run_left);
+		this->m_animation_run_right.setAtlas(&atlas_gamer2_run_right);
+
+		this->m_animation_idle_left.setInterval(75);
+		this->m_animation_idle_right.setInterval(75);
+		this->m_animation_run_left.setInterval(75);
+		this->m_animation_run_right.setInterval(75);
+
+		this->m_size.m_x = 96;
+		this->m_size.m_y = 96;
+	}
+
+	~PlayerGamer2() = default;
+
+	virtual void on_update(int delta)
+	{
+		Player::on_update(delta);
+		std::cout << "Gamer2 on update..." << std::endl;
+	}
+
+};
+
+#endif // !_PLAYERGAMER2_H_
+```
+
+
+
+## 第十一节
+
+### 子弹类基类编写
+
+项目中角色1使用直线子弹抛物线攻击，角色2使用类似开口向下一元二次方程子弹抛物线攻击，总的来说都是使用抛物线进行攻击，那么就可以将其封装类后去实现他，首先创建筛选器bullet并创建文件：bullet.h，gamer1Bullet.h，gamer2Bullet.h，gamer2BulletEx.h。
+
+随后填充bullet基类，创建Bullet类并引入vector2头文件并定义成员变量size碰撞项与position位置velocity速度，以及添加int成员变量damage伤害，其造成碰撞后的回调函数m_callback也需要声明，最后为防止自己发出的子弹对自己造成伤害，引入playerId头文件声明m_target_id子弹碰撞目标玩家ID，以此就可以描述本项目所有子弹类型。
+
+最后是向外提供的方法函数，首先是damage伤害与position坐标的设置set方法与获取get方法，以及在碰撞时可能会使用到碰撞箱需要getSize方法，随后是碰撞目标m_collide_target设置和获取方法get与set方法，子弹碰撞方法只要保存在回调函数内部即可，以及最后get和set子弹是否可以继续碰撞vaild的方法，和查看是否可被移除方法checkCanRemove方便在释放子弹资源阶段使用。
+
+接下来就可以开始着手开始编写虚函数重写部分代码了，首先是on_collide方法用于在发生碰撞时调用，随后是checkCollide方法用于检测子弹是否与指定位置和尺寸目标发生碰撞（为了不过分严格，判断方法为子弹对象矩形中心位置坐标是否进入判断对象内部），以及最后渲染和更新方法on_update和on_draw。
+
+子弹的销毁除了命中目标外，离开屏幕也可以作为销毁的条件之一（注意离开的方向以及条件，避免抛物抛出上方结果消失的情况，不过此处不详细解释），这一部分同样可以作为继承自Bullet逻辑的子类通用逻辑，所以在portected中定义checkIfExceedScreen方法判断是否离开屏幕判断：
+
+```
+#ifndef _BULLET_H_
+#define _BULLET_H_
+
+#include "vector2.h"
+#include "playerId.h"
+#include "camera.h"
+
+#include <functional>
+#include <graphics.h>
+
+class Bullet
+{
+public:
+	Bullet() = default;
+	~Bullet() = default;
+
+	virtual void on_collide()
+	{
+		if (this->m_callback) this->m_callback();
+	}
+
+	virtual bool checkCollide(const Vector2& position, const Vector2& size)
+	{
+		return this->m_position.m_x + this->m_size.m_x / 2 >= position.m_x &&
+			this->m_position.m_x + this->m_size.m_x / 2 <= position.m_x + size.m_x && 
+			this->m_position.m_y + this->m_size.m_y / 2 >= position.m_y && 
+			this->m_position.m_y + this->m_size.m_y / 2 <= position.m_y + size.m_y;
+	}
+
+	virtual void on_update(int delta)
+	{
+	}
+
+	virtual void on_draw(const Camera& camera)
+	{
+	}
+
+	int getDamage() { return this->m_damage; }
+
+	const Vector2& getPosition() { return this->m_position; }
+
+	const Vector2& getSize() { return this->m_size; }
+
+	PlayerId getCollideTarget() const { return this->m_target_id; }
+
+	bool getValid() { return this->is_valid; }
+
+	bool checkCanRemove() { return this->can_remove; }
+
+	void setCallback(std::function<void()> callback) { this->m_callback = callback; }
+
+	void setDamage(int damage) { this->m_damage = damage; }
+
+	void setPosition(float x, float y) { this->m_position.m_x = x, this->m_position.m_y = y; }
+
+	void setVelocity(float x, float y) { this->m_velocity.m_x = x, this->m_velocity.m_y = y; }
+
+	void setCollideTarget(PlayerId target) { this->m_target_id = target; }
+
+	void setValid(bool is_valid) { this->is_valid = is_valid; }
+
+protected:
+	bool checkIfExceedScreen()
+	{
+		return (this->m_position.m_x + this->m_size.m_x <= 0 || this->m_position.m_x > getwidth() || 
+			this->m_position.m_y + this->m_size.m_y <= 0 || this->m_position.m_y > getheight());
+	}
+
+protected:
+	Vector2 m_size;
+	Vector2 m_position;
+	Vector2 m_velocity;
+
+	int m_damage = 10;
+	
+	bool is_valid = true;
+	bool can_remove = false;
+
+	std::function<void()> m_callback;
+
+	PlayerId m_target_id = PlayerId::P1;
+
+};
+
+#endif
+```
+
+
+
+## 第十一节完成代码展示
+
+**bullet.h**
+
+```
+#ifndef _BULLET_H_
+#define _BULLET_H_
+
+#include "vector2.h"
+#include "playerId.h"
+#include "camera.h"
+
+#include <functional>
+#include <graphics.h>
+
+class Bullet
+{
+public:
+	Bullet() = default;
+	~Bullet() = default;
+
+	virtual void on_collide()
+	{
+		if (this->m_callback) this->m_callback();
+	}
+
+	virtual bool checkCollide(const Vector2& position, const Vector2& size)
+	{
+		return this->m_position.m_x + this->m_size.m_x / 2 >= position.m_x &&
+			this->m_position.m_x + this->m_size.m_x / 2 <= position.m_x + size.m_x && 
+			this->m_position.m_y + this->m_size.m_y / 2 >= position.m_y && 
+			this->m_position.m_y + this->m_size.m_y / 2 <= position.m_y + size.m_y;
+	}
+
+	virtual void on_update(int delta)
+	{
+	}
+
+	virtual void on_draw(const Camera& camera)
+	{
+	}
+
+	int getDamage() { return this->m_damage; }
+
+	const Vector2& getPosition() { return this->m_position; }
+
+	const Vector2& getSize() { return this->m_size; }
+
+	PlayerId getCollideTarget() const { return this->m_target_id; }
+
+	bool getValid() { return this->is_valid; }
+
+	bool checkCanRemove() { return this->can_remove; }
+
+	void setCallback(std::function<void()> callback) { this->m_callback = callback; }
+
+	void setDamage(int damage) { this->m_damage = damage; }
+
+	void setPosition(float x, float y) { this->m_position.m_x = x, this->m_position.m_y = y; }
+
+	void setVelocity(float x, float y) { this->m_velocity.m_x = x, this->m_velocity.m_y = y; }
+
+	void setCollideTarget(PlayerId target) { this->m_target_id = target; }
+
+	void setValid(bool is_valid) { this->is_valid = is_valid; }
+
+protected:
+	bool checkIfExceedScreen()
+	{
+		return (this->m_position.m_x + this->m_size.m_x <= 0 || this->m_position.m_x > getwidth() || 
+			this->m_position.m_y + this->m_size.m_y <= 0 || this->m_position.m_y > getheight());
+	}
+
+protected:
+	Vector2 m_size;
+	Vector2 m_position;
+	Vector2 m_velocity;
+
+	int m_damage = 10;
+	
+	bool is_valid = true;
+	bool can_remove = false;
+
+	std::function<void()> m_callback;
+
+	PlayerId m_target_id = PlayerId::P1;
+
+};
+
+#endif
+
+```
+
+
+
+## 第十二节
+
+###玩家子弹派生类实现
+
+由于设计中，决定给角色1攻击设计为直线子弹攻击，由于其只会发射一种类型子弹即直线运动子弹，扩展发射子弹仅仅只是发射频率不同而已，所以来到gamer1Bullet.h中定义Gamer1Bullet类描述角色1子弹，记得引入Bullet.h文件继承Bullet类，浏览资源文件可以发现我们准备了三份gamer1_bullet_break的mp3文件，这是在开发中非常常见的，我们会随机播放三种文件中一种的音效以提升效果。
+
+这样我们就要重写子弹的on_collide的碰撞逻辑为子弹添加不同的破碎音效，虽然继承父类方法但是还是需要调用父类构造方法，也就是基类的on_collide方法，随后使用rand()方法获取随机数随后随机播放加载好的音效。
+
+随后编写on_draw与on_update方法，由于子弹碰撞有动画所以需要引入Animation.h文件并在内部创建Animation成员变量m_animation_bullet_break，接下来来到on_update中根据时间和速度修改子弹位置，随后检查子弹是否失效来决定是否on_update更新动画，以及检查是否超出屏幕外部来设置是否可以被移除，然后就可以编写渲染部分，首先使用extern声明所需的图片和图集对象，并在on_draw中根据是否失效来决定绘制失效动画还是img图片，随后编写初始化逻辑设置制单尺寸为64*64大小矩形以及伤害为10，在对破碎动画进行详细配置包含atlas对象间隔时间100以及false循环loop设置，最后是callbak方法在破碎动画结束播放后修改can_move变量为true。
+
+如此便完成了角色1的子弹类的编写，通过面向对象继承特效，只需要扩展独有的部分代码即可完成：
+
+```
+#ifndef _GAMER1_BULLET_H_
+#define _GAMER1_BULLET_H_
+
+#include "bullet.h"
+#include "animation.h"
+
+extern IMAGE img_gamer1_bullet;
+extern Atlas atlas_gamer1_bullet_break;
+
+class Gamer1Bullet : public Bullet
+{
+public:
+	Gamer1Bullet() 
+	{
+		this->m_size.m_y = this->m_size.m_x = 64;
+		this->m_damage = 10;
+
+		this->m_animation_bullet_break.setAtlas(&atlas_gamer1_bullet_break);
+		this->m_animation_bullet_break.setInterval(100);
+		this->m_animation_bullet_break.setLoop(false);
+		this->m_animation_bullet_break.setCallBack([&]() {this->can_remove = true; });
+	}
+
+	~Gamer1Bullet() = default;
+
+	void on_collide()
+	{
+		Bullet::on_collide();
+
+		switch (rand() % 3)
+		{
+		case 0:
+			mciSendString(L"play gamer1_bullet_break_1 from 0", NULL, 0, NULL);
+			break;
+		case 1:
+			mciSendString(L"play gamer1_bullet_break_2 from 0", NULL, 0, NULL);
+			break;
+		case 2:
+			mciSendString(L"play gamer1_bullet_break_3 from 0", NULL, 0, NULL);
+			break;
+		default:
+			break;
+		}
+	}
+
+	void on_draw(const Camera& camera) const
+	{
+		if (this->can_remove)
+		{
+			putImageAlpha(camera, (int)this->m_position.m_x, (int)this->m_position.m_y, &img_gamer1_bullet);
+		}
+		else
+		{
+			this->m_animation_bullet_break.on_draw(camera, (int)this->m_position.m_x, (int)this->m_position.m_y);
+		}
+	}
+
+	void on_update(int delta)
+	{
+		this->m_position += this->m_velocity * (float)delta;
+
+		if (this->is_valid)
+		{
+			this->m_animation_bullet_break.on_update(delta);
+		}
+
+		if (this->checkIfExceedScreen())
+		{
+			this->can_remove = true;
+		}
+	}
+
+private:
+	Animation m_animation_bullet_break;
+
+};
+
+#endif
+```
+
+
+
+随后来到gamer2Bullet.h头文件中开始编写角色2的子弹代码部分，同样是创建角色2子弹类引入bullet.h继承随后引入animation.h头文件后声明m_animation_idle和m_animation_explode以及一个比较特殊的Vector2类型的爆炸动画渲染偏移m_explode_rander_offset变量，这是因为爆炸动画通常的素材大小是大于子弹大小的，所以未来保证爆炸动画播放位置正确与子弹中心位置对其，我们声明了这个变量来对素材位置对齐使得播放效果正确完成。
+
+构造中同样是设置子弹大小伤害，详细设置动画类随后计算偏移量，由于easyX中都是使用图片左上角作为原点，所以直接使用两者坐标差的一般即可得到正确偏移量了，最后是on_collide函数首先是执行基类碰撞检测，由于我们希望爆炸后使得画面进行抖动，所以来到代码头部引入main_camera声明外部的摄像头对象，随后便可调用摄像头的抖动功能shake进行画面摇晃了，以及注意添加播放爆炸音效。
+
+随后是on_update部分，由于直线子弹与抛物子弹爆炸不一样，抛物线子弹爆炸后，爆炸效果需要保留在原地，所以需要先判断当前状态是否有效，随后定义成员变量m_gravity为0.001为子弹所受重力大小，随后若子弹有效，则根据重力修改其在竖直方向上的速度分量，再根据当前速度修改其位置坐标，随后根据是否有效来决定更新动画对象，最后标记屏幕外子弹为可移除，最后on_draw方法中根据是否有效决定绘制对象，注意添加位置偏移即可完成这一部分的代码：
+
+```
+#ifndef _GAMER2_BULLET_H_
+#define _GAMER2_BULLET_H_
+
+#include "bullet.h"
+#include "animation.h"
+
+extern Camera main_camera;
+
+extern Atlas atlas_gemer2_bullet;
+extern Atlas atlas_gemer2_bullet_explode;
+
+class Gamer2Bullet : public Bullet
+{
+public:
+	Gamer2Bullet() 
+	{
+		this->m_size.m_x = this->m_size.m_y = 96;
+		this->m_damage = 20;
+		
+		this->m_animation_idle.setAtlas(&atlas_gemer2_bullet);
+		this->m_animation_idle.setInterval(50);
+
+		this->m_animation_explode.setAtlas(&atlas_gemer2_bullet_explode);
+		this->m_animation_explode.setInterval(50);
+		this->m_animation_explode.setLoop(false);
+		this->m_animation_explode.setCallBack([&]() {this->can_remove = true; });
+
+		IMAGE* frame_idle = this->m_animation_idle.getFrame();
+		IMAGE* frame_explode = this->m_animation_explode.getFrame();
+
+		this->m_explode_render_offset.m_x = (frame_idle->getwidth() - frame_explode->getwidth()) / 2.0f;
+		this->m_explode_render_offset.m_y = (frame_idle->getheight() - frame_explode->getheight()) / 2.0f;
+
+	}
+
+	~Gamer2Bullet() = default;
+
+	void on_collide()
+	{
+		Bullet::on_collide();
+
+		main_camera.shake(5, 250);
+
+		mciSendString(L"play gamer2_bullet_explode from 0", NULL, 0, NULL);
+	}
+
+	void on_draw(const Camera& camera) const
+	{
+		if (this->is_valid) 
+		{
+			this->m_animation_idle.on_draw(camera, this->m_position.m_x, this->m_position.m_y);
+		}
+		else
+		{
+			this->m_animation_explode.on_draw(camera, this->m_position.m_x + this->m_explode_render_offset.m_x, this->m_position.m_y + this->m_explode_render_offset.m_y);
+		}
+	}
+
+	void on_update(int delta)
+	{
+		if (this->is_valid)
+		{
+			this->m_velocity.m_y += this->m_gravity * delta;
+			this->m_position += this->m_velocity * (float)delta;
+		}
+
+		if (!this->is_valid)
+		{
+			this->m_animation_explode.on_update(delta);
+		}
+		else
+		{
+			this->m_animation_idle.on_update(delta);
+		}
+
+		if (this->checkIfExceedScreen())
+		{
+			this->can_remove = true;
+		}
+	}
+
+private:
+	const float m_gravity = 0.001f;
+
+	Animation m_animation_idle;
+	Animation m_animation_explode;
+	Vector2 m_explode_render_offset;
+
+};
+
+#endif
+```
+
+
+
+最后是垂直下落的角色2扩展发色子弹为垂直下落且速度较慢封锁移动的效果，所以首先来到Gamer2BulletEx.h中声明Gamer2BulletEx类，引入animation.h头文件声明成员变量常态爆炸与偏移Vector2类型并引入Atlas图集与常规子弹无异，引入main_camera编写构造与on_collide方法，此处编写与常规子弹无异，但是注意常规子弹碰撞方法为中心碰撞，扩展子弹更大我们则希望其碰撞检测也更大，所以这里要重写checkCollision检查其x与y是否产生重合即可，随后是on_update部分因没有所受重力的变量所以去除该部分其他与子弹类基本相同，以及on_draw方法中的绘制，与原子弹类一致。
+
+实际上扩展角色2子弹完全可以继承角色2子弹，但是此处展示使用相对扁平的类继承关系，确保代码结构不至于太过难理解：
+
+```
+#ifndef _GAMER2_BULLET_EX_H_
+#define _GAMER2_BULLET_EX_H_
+
+#include "bullet.h"
+#include "animation.h"
+
+extern Camera main_camera;
+
+extern Atlas atlas_gamer2_bullet_ex;
+extern Atlas atlas_gamer2_bullet_ex_explode;
+
+class Gamer2BulletEx : public Bullet
+{
+public:
+	Gamer2BulletEx()
+	{
+		this->m_size.m_x = this->m_size.m_y = 288;
+		this->m_damage = 20;
+
+		this->m_animation_idle.setAtlas(&atlas_gamer2_bullet_ex);
+		this->m_animation_idle.setInterval(50);
+
+		this->m_animation_explode.setAtlas(&atlas_gamer2_bullet_ex_explode);
+		this->m_animation_explode.setInterval(50);
+		this->m_animation_explode.setLoop(false);
+		this->m_animation_explode.setCallBack([&]() {this->can_remove = true; });
+
+		IMAGE* frame_idle = this->m_animation_idle.getFrame();
+		IMAGE* frame_explode = this->m_animation_explode.getFrame();
+
+		this->m_explode_render_offset.m_x = (frame_idle->getwidth() - frame_explode->getwidth()) / 2.0f;
+		this->m_explode_render_offset.m_y = (frame_idle->getheight() - frame_explode->getheight()) / 2.0f;
+
+	}
+
+	~Gamer2BulletEx() = default;
+
+	bool checkCollide(const Vector2& position, const Vector2& size)
+	{
+		bool is_collide_x = (max(this->m_position.m_x + this->m_size.m_x, position.m_x + size.m_x) - min(this->m_position.m_x, position.m_x) <= this->m_size.m_x + size.m_x);
+		bool is_collide_y = (max(this->m_position.m_y + this->m_size.m_y, position.m_y + size.m_y) - min(this->m_position.m_y, position.m_y) <= this->m_size.m_y + size.m_y);
+
+		return is_collide_x && is_collide_y;
+	}
+
+	void on_collide()
+	{
+		Bullet::on_collide();
+
+		main_camera.shake(20, 250);
+
+		mciSendString(L"play gamer2_bullet_explode_ex from 0", NULL, 0, NULL);
+	}
+
+	void on_draw(const Camera& camera) const
+	{
+		if (this->is_valid)
+		{
+			this->m_animation_idle.on_draw(camera, this->m_position.m_x, this->m_position.m_y);
+		}
+		else
+		{
+			this->m_animation_explode.on_draw(camera, this->m_position.m_x + this->m_explode_render_offset.m_x, this->m_position.m_y + this->m_explode_render_offset.m_y);
+		}
+	}
+
+	void on_update(int delta)
+	{
+		if (this->is_valid)
+		{
+			this->m_position += this->m_velocity * (float)delta;
+		}
+
+		if (!this->is_valid)
+		{
+			this->m_animation_explode.on_update(delta);
+		}
+		else
+		{
+			this->m_animation_idle.on_update(delta);
+		}
+
+		if (this->checkIfExceedScreen())
+		{
+			this->can_remove = true;
+		}
+	}
+
+private:
+	Animation m_animation_idle;
+	Animation m_animation_explode;
+	Vector2 m_explode_render_offset;
+
+};
+
+#endif
+```
+
+
+
+## 第十二节完成代码展示
+
+**gamer1Bullet.h**
+
+```
+#ifndef _GAMER1_BULLET_H_
+#define _GAMER1_BULLET_H_
+
+#include "bullet.h"
+#include "animation.h"
+
+extern IMAGE img_gamer1_bullet;
+extern Atlas atlas_gamer1_bullet_break;
+
+class Gamer1Bullet : public Bullet
+{
+public:
+	Gamer1Bullet() 
+	{
+		this->m_size.m_y = this->m_size.m_x = 64;
+		this->m_damage = 10;
+
+		this->m_animation_bullet_break.setAtlas(&atlas_gamer1_bullet_break);
+		this->m_animation_bullet_break.setInterval(100);
+		this->m_animation_bullet_break.setLoop(false);
+		this->m_animation_bullet_break.setCallBack([&]() {this->can_remove = true; });
+	}
+
+	~Gamer1Bullet() = default;
+
+	void on_collide()
+	{
+		Bullet::on_collide();
+
+		switch (rand() % 3)
+		{
+		case 0:
+			mciSendString(L"play gamer1_bullet_break_1 from 0", NULL, 0, NULL);
+			break;
+		case 1:
+			mciSendString(L"play gamer1_bullet_break_2 from 0", NULL, 0, NULL);
+			break;
+		case 2:
+			mciSendString(L"play gamer1_bullet_break_3 from 0", NULL, 0, NULL);
+			break;
+		default:
+			break;
+		}
+	}
+
+	void on_draw(const Camera& camera) const
+	{
+		if (this->can_remove)
+		{
+			putImageAlpha(camera, (int)this->m_position.m_x, (int)this->m_position.m_y, &img_gamer1_bullet);
+		}
+		else
+		{
+			this->m_animation_bullet_break.on_draw(camera, (int)this->m_position.m_x, (int)this->m_position.m_y);
+		}
+	}
+
+	void on_update(int delta)
+	{
+		this->m_position += this->m_velocity * (float)delta;
+
+		if (this->is_valid)
+		{
+			this->m_animation_bullet_break.on_update(delta);
+		}
+
+		if (this->checkIfExceedScreen())
+		{
+			this->can_remove = true;
+		}
+	}
+
+private:
+	Animation m_animation_bullet_break;
+
+};
+
+#endif
+```
+
+**gamer2Bullet.h**
+
+```
+#ifndef _GAMER2_BULLET_H_
+#define _GAMER2_BULLET_H_
+
+#include "bullet.h"
+#include "animation.h"
+
+extern Camera main_camera;
+
+extern Atlas atlas_gemer2_bullet;
+extern Atlas atlas_gemer2_bullet_explode;
+
+class Gamer2Bullet : public Bullet
+{
+public:
+	Gamer2Bullet() 
+	{
+		this->m_size.m_x = this->m_size.m_y = 96;
+		this->m_damage = 20;
+		
+		this->m_animation_idle.setAtlas(&atlas_gemer2_bullet);
+		this->m_animation_idle.setInterval(50);
+
+		this->m_animation_explode.setAtlas(&atlas_gemer2_bullet_explode);
+		this->m_animation_explode.setInterval(50);
+		this->m_animation_explode.setLoop(false);
+		this->m_animation_explode.setCallBack([&]() {this->can_remove = true; });
+
+		IMAGE* frame_idle = this->m_animation_idle.getFrame();
+		IMAGE* frame_explode = this->m_animation_explode.getFrame();
+
+		this->m_explode_render_offset.m_x = (frame_idle->getwidth() - frame_explode->getwidth()) / 2.0f;
+		this->m_explode_render_offset.m_y = (frame_idle->getheight() - frame_explode->getheight()) / 2.0f;
+
+	}
+
+	~Gamer2Bullet() = default;
+
+	void on_collide()
+	{
+		Bullet::on_collide();
+
+		main_camera.shake(5, 250);
+
+		mciSendString(L"play gamer2_bullet_explode from 0", NULL, 0, NULL);
+	}
+
+	void on_draw(const Camera& camera) const
+	{
+		if (this->is_valid) 
+		{
+			this->m_animation_idle.on_draw(camera, this->m_position.m_x, this->m_position.m_y);
+		}
+		else
+		{
+			this->m_animation_explode.on_draw(camera, this->m_position.m_x + this->m_explode_render_offset.m_x, this->m_position.m_y + this->m_explode_render_offset.m_y);
+		}
+	}
+
+	void on_update(int delta)
+	{
+		if (this->is_valid)
+		{
+			this->m_velocity.m_y += this->m_gravity * delta;
+			this->m_position += this->m_velocity * (float)delta;
+		}
+
+		if (!this->is_valid)
+		{
+			this->m_animation_explode.on_update(delta);
+		}
+		else
+		{
+			this->m_animation_idle.on_update(delta);
+		}
+
+		if (this->checkIfExceedScreen())
+		{
+			this->can_remove = true;
+		}
+	}
+
+private:
+	const float m_gravity = 0.001f;
+
+	Animation m_animation_idle;
+	Animation m_animation_explode;
+	Vector2 m_explode_render_offset;
+
+};
+
+#endif
+```
+
+**gamer2BulletEx.h**
+
+```
+#ifndef _GAMER2_BULLET_EX_H_
+#define _GAMER2_BULLET_EX_H_
+
+#include "bullet.h"
+#include "animation.h"
+
+extern Camera main_camera;
+
+extern Atlas atlas_gamer2_bullet_ex;
+extern Atlas atlas_gamer2_bullet_ex_explode;
+
+class Gamer2BulletEx : public Bullet
+{
+public:
+	Gamer2BulletEx()
+	{
+		this->m_size.m_x = this->m_size.m_y = 288;
+		this->m_damage = 20;
+
+		this->m_animation_idle.setAtlas(&atlas_gamer2_bullet_ex);
+		this->m_animation_idle.setInterval(50);
+
+		this->m_animation_explode.setAtlas(&atlas_gamer2_bullet_ex_explode);
+		this->m_animation_explode.setInterval(50);
+		this->m_animation_explode.setLoop(false);
+		this->m_animation_explode.setCallBack([&]() {this->can_remove = true; });
+
+		IMAGE* frame_idle = this->m_animation_idle.getFrame();
+		IMAGE* frame_explode = this->m_animation_explode.getFrame();
+
+		this->m_explode_render_offset.m_x = (frame_idle->getwidth() - frame_explode->getwidth()) / 2.0f;
+		this->m_explode_render_offset.m_y = (frame_idle->getheight() - frame_explode->getheight()) / 2.0f;
+
+	}
+
+	~Gamer2BulletEx() = default;
+
+	bool checkCollide(const Vector2& position, const Vector2& size)
+	{
+		bool is_collide_x = (max(this->m_position.m_x + this->m_size.m_x, position.m_x + size.m_x) - min(this->m_position.m_x, position.m_x) <= this->m_size.m_x + size.m_x);
+		bool is_collide_y = (max(this->m_position.m_y + this->m_size.m_y, position.m_y + size.m_y) - min(this->m_position.m_y, position.m_y) <= this->m_size.m_y + size.m_y);
+
+		return is_collide_x && is_collide_y;
+	}
+
+	void on_collide()
+	{
+		Bullet::on_collide();
+
+		main_camera.shake(20, 250);
+
+		mciSendString(L"play gamer2_bullet_explode_ex from 0", NULL, 0, NULL);
+	}
+
+	void on_draw(const Camera& camera) const
+	{
+		if (this->is_valid)
+		{
+			this->m_animation_idle.on_draw(camera, this->m_position.m_x, this->m_position.m_y);
+		}
+		else
+		{
+			this->m_animation_explode.on_draw(camera, this->m_position.m_x + this->m_explode_render_offset.m_x, this->m_position.m_y + this->m_explode_render_offset.m_y);
+		}
+	}
+
+	void on_update(int delta)
+	{
+		if (this->is_valid)
+		{
+			this->m_position += this->m_velocity * (float)delta;
+		}
+
+		if (!this->is_valid)
+		{
+			this->m_animation_explode.on_update(delta);
+		}
+		else
+		{
+			this->m_animation_idle.on_update(delta);
+		}
+
+		if (this->checkIfExceedScreen())
+		{
+			this->can_remove = true;
+		}
+	}
+
+private:
+	Animation m_animation_idle;
+	Animation m_animation_explode;
+	Vector2 m_explode_render_offset;
+
+};
+
+#endif
+```
+
+
+
+## 第十三节
+
+###子弹发射功能实现
+
+仅仅只有子弹是不够的，如何产生子弹，如何发射子弹，发射何种子弹等等的内容共同组合成了技能系统。本节来完成子弹发射的功能实现。
+
+首先来到player.h中，编写虚成员函数on_attack与on_attack_ex，子类只需要重写这两个方法即可进行攻击与扩展攻击，但是需要考虑其触发时机，对于普通攻击而言其触发时机显然由按键触发所以在按键按下后执行on_attack逻辑即可，但是这样不变成按的越快发射越快了吗，所以还需要设置攻击间隔，定义成员变量can_attack布尔类型变量以及一个Timer类型的m_timer_attack_cd变由于记录角色攻击冷却时间，最后是一个m_attack_cd变量标识攻击冷却毫秒数，每次攻击翻转及实际更改标识符，等待计时器结束后翻转标识符，按键按下时再次触发，由此即完成了攻击的逻辑。
+
+（此处我认为由于按键按下后会在消息队列插入一个按下按键消息，此后长按才会持续触发按键按下消息，假设攻击间隔时间短于这个长按的空隔时间，就会产生第一发和第二发的间隔大于后续的每一发的间隔的情况，有点类似之前产生的移动停顿的问题，所以这里一个应该再定义一个is_attacking标记，按下标记true弹起标记false，触发条件为检查is_attacking是否为true来触发）
+
+接下来再Player构造函数中初始化计时器并设定为单词触发以及回调函数在回调函数中can_attack修改为true，随后on_update中更新定时器的on_update代码，随后来带on_input方法中，对于玩家1按下F键进行攻击而玩家2使用.表示攻击，而扩展攻击则需要能量条满后才能进行攻击，所以成员变量声明角色能量与生命m_mp与m_hp。
+
+（此处是使用的无标识符的方法，我对此修改了应该标记is_attack_keydown标记，对于按键按下直接修改这个标记即可，而攻击实际逻辑处理则是移至on_input末尾了，逻辑是一样的，当标记为true表示当前按下了攻击，若当前可以攻击触发on_attack随后标记不可攻击并重设timer，此处玩家1和玩家2逻辑一致）
+
+随后在on_input中添加处理逻辑，无非角色1和2的按键触发逻辑不同（使用G和，）其他逻辑一致，即判断m_mp是否大于等于100，随后归零并调用on_attack_ex方法。
+
+```
+//虚成员函数攻击方法
+virtual void on_attack() {}
+virtual void on_attack_ex() {}
+
+//攻击相关成员变量
+bool is_attack_keydown = false;
+bool can_attack = true;
+int m_attack_cd = 500;
+Timer m_timer_attack_cd;
+
+//构造方法初始化攻击间隔时钟
+this->m_timer_attack_cd.setWaitTime(this->m_attack_cd);
+this->m_timer_attack_cd.setOneShot(true);
+this->m_timer_attack_cd.setCallback([&]() {this->can_attack = true; });
+
+//on_input方法添加按键响应
+virtual void on_input(const ExMessage& msg)
+{
+	switch (msg.message)
+	{
+	case WM_KEYDOWN:
+		switch (this->m_id)
+		{
+		case PlayerId::P1:
+			switch (msg.vkcode)
+			{
+			case 0x41://'A'
+				this->is_left_keydown = true;
+				break;
+			case 0x44://'D'
+				this->is_right_keydown = true;
+				break;
+			case 0x57://'W'
+				this->on_jump();
+				break;
+			case 0x46://'F'
+				this->is_attack_keydown = true;
+				break;
+			}
+			break;
+		case PlayerId::P2:
+			switch (msg.vkcode)
+			{
+			case VK_LEFT://'←'
+				this->is_left_keydown = true;
+				break;
+			case VK_RIGHT://'→'
+				this->is_right_keydown = true;
+				break;
+			case VK_UP://'↑'
+				this->on_jump();
+				break;
+			case VK_OEM_PERIOD://'.'
+				this->is_attack_keydown = true;
+				break;
+			case VK_OEM_COMMA://','
+				if (this->m_mp >= 100) this->m_mp = 0, this->on_attack_ex();
+				break;
+			}
+			break;
+		}
+		break;
+	case WM_KEYUP:
+		switch (this->m_id)
+		{
+		case PlayerId::P1:
+			switch (msg.vkcode)
+			{
+			case 0x41://'A'
+				this->is_left_keydown = false;
+				break;
+			case 0x44://'D'
+				this->is_right_keydown = false;
+				break;
+			case 0x46://'F'
+				this->is_attack_keydown = false;
+				break;
+			case 0x47:///'G'
+				if (this->m_mp >= 100) this->m_mp = 0, this->on_attack_ex();
+				break;
+			}
+			break;
+		case PlayerId::P2:
+			switch (msg.vkcode)
+			{
+			case VK_LEFT://'←'
+				this->is_left_keydown = false;
+				break;
+			case VK_RIGHT://'→'
+				this->is_right_keydown = false;
+				break;
+			case VK_OEM_PERIOD://'.'
+				this->is_attack_keydown = false;
+				break;
+			}
+			break;
+		}
+		break;
+	}
+
+	if (this->is_attack_keydown)
+	{
+		if (this->can_attack)
+		{
+			this->on_attack();
+			this->can_attack = false;
+			this->m_timer_attack_cd.restart();
+		}
+	}
+}
+
+```
+
+
+
+完成了基类编写，接下来就应该到子类中完成逻辑的补充了，首先来到playerGamer1.h中重写on_attack与on_attack_ex方法，由于角色1发射的只有直线子弹，所以选择封装创建子弹的spawnBullet1方法，通过传入float参数决定生成直线子弹的速度，随后引入gamer1Bullet.h即可开始在方法内部实例化子弹对象了。
+
+首先实例化子弹，创建两个临时变量Vecctor2类型的bullet_position和bullet_velocity变量用于存储子弹坐标与速度，注意生成坐标位置不应该和角色坐标一致，期望的位置应该存在一定偏移当前的项目我们希望子弹初始位置紧贴角色面朝方向的边缘处
+
+
+
+
+
+
+
+## 第十三节完整代码
+
+**player.h**
+
+
+
+**playerGamer1.h**
+

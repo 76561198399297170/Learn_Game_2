@@ -24,6 +24,9 @@ public:
 		this->m_animation_idle_right.setInterval(75);
 		this->m_animation_run_left.setInterval(75);
 		this->m_animation_run_right.setInterval(75);
+
+		this->m_size.m_x = 96;
+		this->m_size.m_y = 96;
 	}
 
 	~PlayerGamer2() = default;
