@@ -1288,7 +1288,7 @@ void loadGameResources()
 	atlas_gamer2_die_right.loadFromFile(L"./resources/gamer2_die_%d.png", 2);
 	flipAtlas(atlas_gamer2_die_right, atlas_gamer2_die_left);
 
-	loadimage(&img_gamer1_bullet, L"./resources/gamer_bullet.png");
+	loadimage(&img_gamer1_bullet, L"./resources/gamer_bullet1.png");
 	atlas_gamer1_bullet_break.loadFromFile(L"./resources/gamer1_bullet_break_%d.png", 3);
 	atlas_gemer2_bullet.loadFromFile(L"./resources/gamer2_bullet_%d.png", 5);
 	atlas_gemer2_bullet_explode.loadFromFile(L"./resources/gamer2_bullet_explode_%d.png", 5);
@@ -1630,7 +1630,7 @@ void loadGameResources()
 	atlas_gamer2_die_right.loadFromFile(L"./resources/gamer2_die_%d.png", 2);
 	flipAtlas(atlas_gamer2_die_right, atlas_gamer2_die_left);
 
-	loadimage(&img_gamer1_bullet, L"./resources/gamer_bullet.png");
+	loadimage(&img_gamer1_bullet, L"./resources/gamer1_bullet.png");
 	atlas_gamer1_bullet_break.loadFromFile(L"./resources/gamer1_bullet_break_%d.png", 3);
 	atlas_gemer2_bullet.loadFromFile(L"./resources/gamer2_bullet_%d.png", 5);
 	atlas_gemer2_bullet_explode.loadFromFile(L"./resources/gamer2_bullet_explode_%d.png", 5);
@@ -2277,7 +2277,7 @@ void loadGameResources()
 	atlas_gamer2_die_right.loadFromFile(L"./resources/gamer2_die_%d.png", 2);
 	flipAtlas(atlas_gamer2_die_right, atlas_gamer2_die_left);
 
-	loadimage(&img_gamer1_bullet, L"./resources/gamer_bullet.png");
+	loadimage(&img_gamer1_bullet, L"./resources/gamer1_bullet.png");
 	atlas_gamer1_bullet_break.loadFromFile(L"./resources/gamer1_bullet_break_%d.png", 3);
 	atlas_gemer2_bullet.loadFromFile(L"./resources/gamer2_bullet_%d.png", 5);
 	atlas_gemer2_bullet_explode.loadFromFile(L"./resources/gamer2_bullet_explode_%d.png", 5);
@@ -4120,7 +4120,7 @@ void loadGameResources()
 	atlas_gamer2_die_right.loadFromFile(L"./resources/gamer2_die_%d.png", 2);
 	flipAtlas(atlas_gamer2_die_right, atlas_gamer2_die_left);
 
-	loadimage(&img_gamer1_bullet, L"./resources/gamer_bullet.png");
+	loadimage(&img_gamer1_bullet, L"./resources/gamer1_bullet.png");
 	atlas_gamer1_bullet_break.loadFromFile(L"./resources/gamer1_bullet_break_%d.png", 3);
 	atlas_gemer2_bullet.loadFromFile(L"./resources/gamer2_bullet_%d.png", 5);
 	atlas_gemer2_bullet_explode.loadFromFile(L"./resources/gamer2_bullet_explode_%d.png", 5);
@@ -5029,7 +5029,7 @@ void loadGameResources()
 	atlas_gamer2_die_right.loadFromFile(L"./resources/gamer2_die_%d.png", 2);
 	flipAtlas(atlas_gamer2_die_right, atlas_gamer2_die_left);
 
-	loadimage(&img_gamer1_bullet, L"./resources/gamer_bullet.png");
+	loadimage(&img_gamer1_bullet, L"./resources/gamer1_bullet.png");
 	atlas_gamer1_bullet_break.loadFromFile(L"./resources/gamer1_bullet_break_%d.png", 3);
 	atlas_gemer2_bullet.loadFromFile(L"./resources/gamer2_bullet_%d.png", 5);
 	atlas_gemer2_bullet_explode.loadFromFile(L"./resources/gamer2_bullet_explode_%d.png", 5);
@@ -5884,7 +5884,7 @@ void loadGameResources()
 	atlas_gamer2_die_right.loadFromFile(L"./resources/gamer2_die_%d.png", 2);
 	flipAtlas(atlas_gamer2_die_right, atlas_gamer2_die_left);
 
-	loadimage(&img_gamer1_bullet, L"./resources/gamer_bullet.png");
+	loadimage(&img_gamer1_bullet, L"./resources/gamer1_bullet.png");
 	atlas_gamer1_bullet_break.loadFromFile(L"./resources/gamer1_bullet_break_%d.png", 3);
 	atlas_gemer2_bullet.loadFromFile(L"./resources/gamer2_bullet_%d.png", 5);
 	atlas_gemer2_bullet_explode.loadFromFile(L"./resources/gamer2_bullet_explode_%d.png", 5);
@@ -7175,7 +7175,7 @@ public:
 	{
 	}
 
-	virtual void on_draw(const Camera& camera)
+	virtual void on_draw(const Camera& camera) const
 	{
 	}
 
@@ -7269,7 +7269,7 @@ public:
 	{
 	}
 
-	virtual void on_draw(const Camera& camera)
+	virtual void on_draw(const Camera& camera) const
 	{
 	}
 
@@ -7328,7 +7328,7 @@ protected:
 
 ## 第十二节
 
-###玩家子弹派生类实现
+### 玩家子弹派生类实现
 
 由于设计中，决定给角色1攻击设计为直线子弹攻击，由于其只会发射一种类型子弹即直线运动子弹，扩展发射子弹仅仅只是发射频率不同而已，所以来到gamer1Bullet.h中定义Gamer1Bullet类描述角色1子弹，记得引入Bullet.h文件继承Bullet类，浏览资源文件可以发现我们准备了三份gamer1_bullet_break的mp3文件，这是在开发中非常常见的，我们会随机播放三种文件中一种的音效以提升效果。
 
@@ -7386,7 +7386,7 @@ public:
 
 	void on_draw(const Camera& camera) const
 	{
-		if (this->can_remove)
+		if (this->is_valid)
 		{
 			putImageAlpha(camera, (int)this->m_position.m_x, (int)this->m_position.m_y, &img_gamer1_bullet);
 		}
@@ -7680,7 +7680,7 @@ public:
 
 	void on_draw(const Camera& camera) const
 	{
-		if (this->can_remove)
+		if (this->is_valid)
 		{
 			putImageAlpha(camera, (int)this->m_position.m_x, (int)this->m_position.m_y, &img_gamer1_bullet);
 		}
@@ -7914,7 +7914,7 @@ private:
 
 ## 第十三节
 
-###子弹发射功能实现
+### 子弹发射功能实现
 
 仅仅只有子弹是不够的，如何产生子弹，如何发射子弹，发射何种子弹等等的内容共同组合成了技能系统。本节来完成子弹发射的功能实现。
 
@@ -7924,7 +7924,7 @@ private:
 
 接下来再Player构造函数中初始化计时器并设定为单词触发以及回调函数在回调函数中can_attack修改为true，随后on_update中更新定时器的on_update代码，随后来带on_input方法中，对于玩家1按下F键进行攻击而玩家2使用.表示攻击，而扩展攻击则需要能量条满后才能进行攻击，所以成员变量声明角色能量与生命m_mp与m_hp。
 
-（此处是使用的无标识符的方法，我对此修改了应该标记is_attack_keydown标记，对于按键按下直接修改这个标记即可，而攻击实际逻辑处理则是移至on_input末尾了，逻辑是一样的，当标记为true表示当前按下了攻击，若当前可以攻击触发on_attack随后标记不可攻击并重设timer，此处玩家1和玩家2逻辑一致）
+（此处是使用的无标识符的方法，我对此修改了应该标记is_attack_keydown标记，对于按键按下直接修改这个标记即可，而攻击实际逻辑处理则是移至on_update开头了，逻辑是一样的，当标记为true表示当前按下了攻击，若当前可以攻击触发on_attack随后标记不可攻击并重设timer，此处玩家1和玩家2逻辑一致）
 
 随后在on_input中添加处理逻辑，无非角色1和2的按键触发逻辑不同（使用G和，）其他逻辑一致，即判断m_mp是否大于等于100，随后归零并调用on_attack_ex方法。
 
@@ -8028,8 +8028,10 @@ virtual void on_input(const ExMessage& msg)
 		}
 		break;
 	}
+}
 
-	if (this->is_attack_keydown)
+//on_update中开头添加处理
+if (this->is_attack_keydown)
 	{
 		if (this->can_attack)
 		{
@@ -8038,19 +8040,302 @@ virtual void on_input(const ExMessage& msg)
 			this->m_timer_attack_cd.restart();
 		}
 	}
+```
+
+
+
+完成了基类编写，接下来就应该到子类中完成逻辑的补充了，首先来到playerGamer1.h中重写on_attack与on_attack_ex方法，由于角色1发射的只有直线子弹，所以选择封装创建子弹的spawnBullet1方法，通过传入float参数speed决定生成直线子弹的速度，随后引入gamer1Bullet.h即可开始在方法内部实例化子弹对象了。
+
+首先实例化子弹，创建两个临时变量Vecctor2类型的bullet_position和bullet_velocity变量用于存储子弹坐标与速度，注意生成坐标位置不应该和角色坐标一致，期望的位置应该存在一定偏移当前的项目我们希望子弹初始位置紧贴角色面朝方向的边缘处，所以需要先获取子弹尺寸与朝向，随后计算得出实际生成位置，并对速度等属性其进行设置，并且注意设置子弹碰撞目标，最后是子弹发生碰撞后回调函数设置。
+
+```
+void spawnBullet1(float speed)
+{
+	Bullet* bullet = new Gamer1Bullet();
+
+	Vector2 bullet_position, bullet_velocity;
+	const Vector2& bullet_size = bullet->getSize();
+
+	bullet_position.m_x = this->is_facing_right ? this->m_position.m_x + this->m_size.m_x - bullet_size.m_x / 2 : this->m_position.m_x - bullet_size.m_x / 2;
+	bullet_position.m_y = this->m_position.m_y;
+
+	bullet_velocity.m_x = this->is_facing_right ? speed : -speed;
+	bullet_velocity.m_y = 0;
+
+	bullet->setPosition(bullet_position.m_x, bullet_position.m_y);
+	bullet->setVelocity(bullet_velocity.m_x, bullet_velocity.m_y);
+
+	bullet->setCollideTarget(this->m_id == PlayerId::P1 ? PlayerId::P2 : PlayerId::P1);
+	bullet->setCallback([&]() {this->m_mp += 25; });
 }
 
 ```
 
 
 
-完成了基类编写，接下来就应该到子类中完成逻辑的补充了，首先来到playerGamer1.h中重写on_attack与on_attack_ex方法，由于角色1发射的只有直线子弹，所以选择封装创建子弹的spawnBullet1方法，通过传入float参数决定生成直线子弹的速度，随后引入gamer1Bullet.h即可开始在方法内部实例化子弹对象了。
+随后考虑生成子弹存放何处，此处简单将其与平台类似存放于全局vector中，来到main.cpp中，引入bullet.h文件随后定义Bullet指针数组bullet_list回到player.h中即可使用extern声明获取到了，随后playerGamer1.h中在spawnBullet1末尾将创建完成的子弹添加到list中，如此完成整改子弹生成逻辑，随后只需在on_attack中调用封装好的子弹生成逻辑然后播放随机音效即可，注意由于需要速度参数，重写之前可以声明好成员变量子弹速度，如此普通攻击部分完成，接下来开始考虑特殊攻击部分。
 
-首先实例化子弹，创建两个临时变量Vecctor2类型的bullet_position和bullet_velocity变量用于存储子弹坐标与速度，注意生成坐标位置不应该和角色坐标一致，期望的位置应该存在一定偏移当前的项目我们希望子弹初始位置紧贴角色面朝方向的边缘处
+```
+//main.cpp中全局区添加代码
+#include "bullet.h"
+std::vector<Bullet*> bullet_list;
+
+//player.h中全局区添加代码
+#include "bullet.h"
+extern std::vector<Bullet*> bullet_list;
+
+//playerGamer1.h中在spawnBullet1末尾添加代码		bullet_list.push_back(bullet);
+
+//playerGamer1.h中添加成员变量
+private:
+	const float speed_bullet = 0.75f;
+	const float speed_bullet_ex = 1.5f;
+
+//playerGamer1.h中重写on_attack方法
+void on_attack()
+{
+	this->spawnBullet1(this->speed_bullet);
+
+	switch (rand() % 2)
+	{
+	case 0:
+		mciSendString(L"player gamer1_bullet_shoot_1 from 0", NULL, 0, NULL);
+		break;
+	case 1:
+		mciSendString(L"player gamer1_bullet_shoot_2 from 0", NULL, 0, NULL);
+		break;
+	}
+}
+
+```
 
 
 
+由于特殊攻击条件为能量满值所以无需记录其冷却时间，但特殊攻击为持续状态，希望处于该状态时角色不允许随意移动跳跃，所以在player.h中声明布尔类型变量标记是否处于特殊攻击状态，随后即可在on_run方法中先进行状态判断，随后再进行坐标变换，同理on_jump中也进行修改判断即可
 
+```
+//成员变量添加
+bool is_attacking_ex = false;
+
+//修改成员函数
+void on_jump()
+{
+	if (this->m_velocity.m_y != 0 || this->is_attacking_ex) return;
+
+	this->m_velocity.m_y += this->jump_velocity;
+}
+
+void on_run(float destance) 
+{
+	if (this->is_attacking_ex) return;
+
+	this->m_position.m_x += destance;
+}
+
+```
+
+
+
+接下来来到playerGamer1.h中编写两个定时器，控制角色特殊攻击退出与特殊攻击时子弹发射，以及可以添加一个常量标记特殊攻击持续时长，随后在构造中设置定时器以及赋值攻击间隔即可。
+
+```
+//成员变量添加
+const int attack_ex_duration = 2500;
+
+Timer m_timer_attack_ex;
+Timer m_timer_spawn_bullet_ex;
+
+//构造函数增加及赋值
+this->m_timer_attack_ex.setWaitTime(this->attack_ex_duration);
+this->m_timer_attack_ex.setOneShot(true);
+this->m_timer_attack_ex.setCallback([&]() {this->is_attacking_ex = false; });
+
+this->m_timer_spawn_bullet_ex.setWaitTime(100);
+this->m_timer_spawn_bullet_ex.setOneShot(false);
+this->m_timer_spawn_bullet_ex.setCallback([&]() {this->spawnBullet1(this->speed_bullet_ex); });
+
+this->m_attack_cd = 100;
+```
+
+
+
+特殊攻击方法则是直接在调用特殊攻击函数时更改标记并重启计时器即可，由于特殊攻击时使用动画为额外动画，所以需要来到player.h中，添加角色向左向右特殊攻击动画的成员变量，这样就可以在角色1的特殊攻击后根据不同朝向重置不同接收状态了，并且播放其攻击音频，由于添加了动画就需要对新动画进行赋值。
+
+在文件头部extern引入特殊攻击对应两套图集，随后初始化动画图集以及帧间隔，除此之外我们希望画面中，在角色1触发特殊攻击时画面抖动，所以在on_update中根据是否处于特殊攻击中来对摄像头抖动以及计时器进行更新，至此角色1的普通攻击与特殊攻击完成。
+
+```
+//player.h添加成员变量
+Animation m_animation_attack_ex_left;
+Animation m_animation_attack_ex_right;
+
+//playerGamer1.h重写特殊攻击函数
+void on_attack_ex()
+{
+    this->is_attacking_ex = true;
+    this->m_timer_attack_ex.restart();
+}
+
+//playerGamer1.h构造方法初始化
+this->m_animation_attack_ex_left.setAtlas(&atlas_gamer1_attack_ex_left);
+this->m_animation_attack_ex_right.setAtlas(&atlas_gamer1_attack_ex_right);
+this->m_animation_attack_ex_left.setInterval(75);
+this->m_animation_attack_ex_right.setInterval(75);
+
+//playerGamer1.h更新on_update方法
+virtual void on_update(int delta)
+{
+	Player::on_update(delta);
+
+	if (this->is_attacking_ex)
+	{
+		main_camera.shake(5, 100);
+		this->m_timer_attack_ex.on_updata(delta);
+		this->m_timer_spawn_bullet_ex.on_updata(delta);
+	}
+}
+
+```
+
+
+
+在此基础上编写角色2方法简单的更多了，首先是在playerGamer2.h顶部引入所需要的图集和头文件，由于在角色2中特别地，在子弹位置添加了图片样式的文本，所以需要额外添加一个头部文本动画的成员变量，并且区别角色1的子弹角色2子弹使用抛物线以及垂直下落，所以定义两个常量设定抛物线速度以及下落速度，如此可以在构造方法中进行初始化操作，包括动画设置，回调设置，动画循环设置以及冷却设置，随后就可以在on_update中添加当文本可见是动画更新逻辑，又由于在绘制本体外新增了绘制文本的功能，所以需要额外编写on_draw的重写方法并在开头首先调用父类绘图方法，主体部分逻辑则是经典的判断是否需要绘制，计算绘制位置，进行绘制的步骤。
+
+随后就是on_attack的具体实现了，首先创建子弹对象，随后计算其偏移位置，设定子弹的速度，最后进行标记与回调设置并存入子弹即可。而特殊攻击方法首先设置状态与文本可见，随后由于我们希望其额外攻击位置生成于对方头顶的屏幕外并缓慢落下，所以需要在文件头部声明引入玩家指针。
+
+```
+//顶部引入所需图集
+#include "gamer2Bullet.h"
+#include "gamer2BulletEx.h"
+
+extern Atlas atlas_gamer2_attack_ex_left;
+extern Atlas atlas_gamer2_attack_ex_right;
+extern Atlas atlas_gamer2_bullet_text;
+
+extern Player* player_1;
+extern Player* player_2;
+
+//成员变量添加
+const float speed_bullet_ex = 0.15f;
+const Vector2 velocity_bullet = { 0.25f, -0.05f };
+
+bool is_bullet_ex_visible = false;//设置是否现实特殊攻击子弹顶部文本
+
+Animation m_animation_bullet_text;
+
+//构造初始化代码添加
+this->m_animation_attack_ex_left.setAtlas(&atlas_gamer2_attack_ex_left);
+this->m_animation_attack_ex_right.setAtlas(&atlas_gamer2_attack_ex_right);
+this->m_animation_bullet_text.setAtlas(&atlas_gamer2_bullet_text);
+
+this->m_animation_attack_ex_left.setInterval(100);
+this->m_animation_attack_ex_right.setInterval(100);
+this->m_animation_bullet_text.setInterval(100);
+
+this->m_animation_attack_ex_left.setLoop(false);
+this->m_animation_attack_ex_right.setLoop(false);
+this->m_animation_bullet_text.setLoop(false);
+
+this->m_animation_attack_ex_left.setCallBack([&]() { this->is_bullet_ex_visible = this->is_attacking_ex = false; });
+this->m_animation_attack_ex_right.setCallBack([&]() { this->is_bullet_ex_visible = this->is_attacking_ex = false; });
+
+this->m_attack_cd = 250;
+
+//更新on_update方法
+virtual void on_update(int delta)
+{
+	Player::on_update(delta);
+
+	if (this->is_bullet_ex_visible) this->m_animation_bullet_text.on_update(delta);
+}
+
+//重写on_draw绘图方法
+virtual void on_draw(const Camera& camera)
+{
+	Player::on_draw(camera);
+
+	if (this->is_bullet_ex_visible)
+	{
+		Vector2 text_position;
+		IMAGE* frame = this->m_animation_bullet_text.getFrame();
+
+		text_position.m_x = this->m_position.m_x - (this->m_size.m_x - frame->getwidth()) / 2;
+		text_position.m_y = this->m_position.m_y - frame->getheight();
+
+		this->m_animation_bullet_text.on_draw(camera, (int)text_position.m_x, (int)text_position.m_y);
+	}
+}
+
+//on_attack方法重写
+void on_attack()
+{
+	Bullet* bullet = new Gamer2Bullet();
+
+	Vector2 bullet_positon;
+	const Vector2& bullet_size = bullet->getSize();
+	bullet_positon.m_x = this->m_position.m_x + (this->m_size.m_x - bullet_size.m_x) / 2;
+	bullet_positon.m_y = this->m_position.m_y;
+
+	bullet->setPosition(bullet_positon.m_x, bullet_positon.m_y);
+	bullet->setVelocity(is_facing_right ? this->velocity_bullet.m_x : -this->velocity_bullet.m_x, this->velocity_bullet.m_y);
+
+	bullet->setCollideTarget(this->m_id == PlayerId::P1 ? PlayerId::P2 : PlayerId::P1);
+	bullet->setCallback([&]() { this->m_mp += 35; });
+
+	bullet_list.push_back(bullet);
+}
+
+```
+
+
+
+此处另起一块说明接下来出现问题了，因为需要生成位置基于玩家，所以玩家中需要有相关的get方法，所以来到player.h中，添加getSize方法返回玩家大小，getPosition获取玩家坐标。
+
+```
+//新增方法
+const Vector2& getPosition() const { return this->m_position; }
+
+const Vector2& getSize() const { return this->m_size; }
+
+```
+
+
+
+这样就可以开始着手完成角色2特殊攻击on_attack_ex函数重写了，继续之前从开始修改标记，接下来就是对文本动画重置并根据面朝方向重置对应方向特殊攻击，随后创建对应子弹类，找到需要攻击的对象，计算子弹位置并设置子弹坐标与速度，设置攻击对象随后设置回调并存入子弹，最后别忘了音效播放，至此子弹的大部分内容已经完成编写，下一节将继续以完成完整内容。
+
+```
+//完成特殊攻击重写
+void on_attack_ex()
+{
+	this->is_attacking_ex = true;
+	this->is_bullet_ex_visible = true;
+
+	this->m_animation_bullet_text.reset();
+	this->is_facing_right ? this->m_animation_attack_ex_right.reset() : this->m_animation_attack_ex_right.reset();
+
+	Bullet* bullet = new Gamer2BulletEx();
+	Player* target = (this->m_id == PlayerId::P1 ? player_2 : player_1);
+
+	Vector2 bullet_position, bullet_velocity;
+	const Vector2& bullet_size = bullet->getSize();
+	const Vector2& target_size = target->getSize();
+	const Vector2& target_position = target->getPosition();
+
+	bullet_position.m_x = target_position.m_x + (target_size.m_x - bullet_size.m_x) / 2;
+	bullet_position.m_y = -this->m_size.m_y;
+	bullet_velocity.m_x = 0;
+	bullet_velocity.m_y = this->speed_bullet_ex;
+
+	bullet->setPosition(bullet_position.m_x, bullet_position.m_y);
+	bullet->setVelocity(bullet_velocity.m_x, bullet_velocity.m_y);
+
+	bullet->setCollideTarget(this->m_id == PlayerId::P1 ? PlayerId::P2 : PlayerId::P1);
+
+	bullet->setCallback([&]() {this->m_mp += 30; });
+
+	bullet_list.push_back(bullet);
+}
+
+```
 
 
 
@@ -8058,7 +8343,800 @@ virtual void on_input(const ExMessage& msg)
 
 **player.h**
 
+```
+#ifndef _PLAYER_H_
+#define _PLAYER_H_
 
+#include "camera.h"
+#include "vector2.h"
+#include "animation.h"
+#include "playerId.h"
+#include "platform.h"
+#include "bullet.h"
+
+#include <graphics.h>
+
+extern std::vector<Platform> platform_list;
+extern std::vector<Bullet*> bullet_list;
+
+class Player
+{
+public:
+	Player()
+	{
+		this->m_current_animaiton = &this->m_animation_idle_right;
+
+		this->m_timer_attack_cd.setWaitTime(this->m_attack_cd);
+		this->m_timer_attack_cd.setOneShot(true);
+		this->m_timer_attack_cd.setCallback([&]() {this->can_attack = true; });
+	}
+
+	~Player() = default;
+
+	virtual void on_update(int delta)
+	{
+		if (this->is_attack_keydown)
+		{
+			if (this->can_attack)
+			{
+				this->on_attack();
+				this->can_attack = false;
+				this->m_timer_attack_cd.restart();
+			}
+		}
+
+		int direction = this->is_right_keydown - this->is_left_keydown;
+
+		if (direction != 0)
+		{
+			this->is_facing_right = direction > 0;
+			this->m_current_animaiton = is_facing_right ? &this->m_animation_run_right : &this->m_animation_run_left;
+			
+			float distance = direction * this->run_velocity * delta;
+			this->on_run(distance);
+
+		}
+		else
+		{
+			this->m_current_animaiton = is_facing_right ? &this->m_animation_idle_right : &this->m_animation_idle_left;
+		}
+
+		this->m_current_animaiton->on_update(delta);
+		this->m_timer_attack_cd.on_updata(delta);
+		this->moveAndCollide(delta);
+	}
+
+	virtual void on_draw(const Camera& camera)
+	{
+		this->m_current_animaiton->on_draw(camera, this->m_position.m_x, this->m_position.m_y);
+	}
+
+	virtual void on_input(const ExMessage& msg)
+	{
+		switch (msg.message)
+		{
+		case WM_KEYDOWN:
+			switch (this->m_id)
+			{
+			case PlayerId::P1:
+				switch (msg.vkcode)
+				{
+				case 0x41://'A'
+					this->is_left_keydown = true;
+					break;
+				case 0x44://'D'
+					this->is_right_keydown = true;
+					break;
+				case 0x57://'W'
+					this->on_jump();
+					break;
+				case 0x46://'F'
+					this->is_attack_keydown = true;
+					break;
+				}
+				break;
+			case PlayerId::P2:
+				switch (msg.vkcode)
+				{
+				case VK_LEFT://'←'
+					this->is_left_keydown = true;
+					break;
+				case VK_RIGHT://'→'
+					this->is_right_keydown = true;
+					break;
+				case VK_UP://'↑'
+					this->on_jump();
+					break;
+				case VK_OEM_PERIOD://'.'
+					this->is_attack_keydown = true;
+					break;
+				case VK_OEM_COMMA://','
+					if (this->m_mp >= 100) this->m_mp = 0, this->on_attack_ex();
+					break;
+				}
+				break;
+			}
+			break;
+		case WM_KEYUP:
+			switch (this->m_id)
+			{
+			case PlayerId::P1:
+				switch (msg.vkcode)
+				{
+				case 0x41://'A'
+					this->is_left_keydown = false;
+					break;
+				case 0x44://'D'
+					this->is_right_keydown = false;
+					break;
+				case 0x46://'F'
+					this->is_attack_keydown = false;
+					break;
+				case 0x47:///'G'
+					if (this->m_mp >= 100) this->m_mp = 0, this->on_attack_ex();
+					break;
+				}
+				break;
+			case PlayerId::P2:
+				switch (msg.vkcode)
+				{
+				case VK_LEFT://'←'
+					this->is_left_keydown = false;
+					break;
+				case VK_RIGHT://'→'
+					this->is_right_keydown = false;
+					break;
+				case VK_OEM_PERIOD://'.'
+					this->is_attack_keydown = false;
+					break;
+				}
+				break;
+			}
+			break;
+		}
+
+	}
+
+	void on_jump()
+	{
+		if (this->m_velocity.m_y != 0 || this->is_attacking_ex) return;
+
+		this->m_velocity.m_y += this->jump_velocity;
+	}
+
+	void on_run(float destance) 
+	{
+		if (this->is_attacking_ex) return;
+
+		this->m_position.m_x += destance;
+	}
+
+	void moveAndCollide(int delta)
+	{
+		this->m_velocity.m_y += this->gravity * delta;
+		this->m_position += this->m_velocity * (float)delta;
+
+		if (this->m_velocity.m_y > 0)
+		{
+			for (const Platform& pt : platform_list)
+			{
+				const Platform::CollisionShape& shape = pt.m_shape;
+
+				bool is_collide_x = (max(this->m_position.m_x + this->m_size.m_x, shape.right) - min(this->m_position.m_x, shape.left) <= this->m_size.m_x + (shape.right - shape.left));
+				bool is_collide_y = (shape.y >= this->m_position.m_y && shape.y <= this->m_position.m_y + this->m_size.m_y);
+
+				if (is_collide_x && is_collide_y)
+				{
+					float delta_pos_y = this->m_velocity.m_y * delta;
+					float last_tick_foot_pos_y = this->m_position.m_y + this->m_size.m_y - delta_pos_y;
+					if (last_tick_foot_pos_y <= shape.y)
+					{
+						this->m_position.m_y = shape.y - this->m_size.m_y;
+						this->m_velocity.m_y = 0;
+
+						break;
+					}
+				}
+			}
+		}
+	}
+
+	void setId(PlayerId id) { this->m_id = id; }
+
+	void setPosition(int x, int y) { this->m_position.m_x = x, this->m_position.m_y = y; }
+
+	const Vector2& getPosition() const { return this->m_position; }
+
+	const Vector2& getSize() const { return this->m_size; }
+
+	virtual void on_attack() {}
+
+	virtual void on_attack_ex() {}
+
+protected:
+	int m_hp = 100;
+	int m_mp = 0;
+
+	Vector2 m_size;
+	Vector2 m_position;
+	Vector2 m_velocity;
+
+	Animation m_animation_idle_left;
+	Animation m_animation_idle_right;
+	Animation m_animation_run_left;
+	Animation m_animation_run_right;
+	Animation m_animation_attack_ex_left;
+	Animation m_animation_attack_ex_right;
+
+	Animation* m_current_animaiton = nullptr;
+
+	PlayerId m_id;
+
+	const float run_velocity = 0.55f;//水平移动速度
+	const float gravity = 0.0016f;//重力加速度
+	const float jump_velocity = -0.85f;//跳跃速度
+
+	bool is_left_keydown = false;
+	bool is_right_keydown = false;
+
+	bool is_facing_right = true;
+
+	bool is_attack_keydown = false;
+	bool is_attacking_ex = false;
+
+	bool can_attack = true;
+	int m_attack_cd = 500;
+	Timer m_timer_attack_cd;
+
+};
+
+#endif
+```
 
 **playerGamer1.h**
+
+```
+#ifndef _PLAYERGAMER1_H_
+#define _PLAYERGAMER1_H_
+
+#include "player.h"
+#include "gamer1Bullet.h"
+
+extern Atlas atlas_gamer1_idle_left;
+extern Atlas atlas_gamer1_idle_right;
+extern Atlas atlas_gamer1_run_left;
+extern Atlas atlas_gamer1_run_right;
+extern Atlas atlas_gamer1_attack_ex_left;
+extern Atlas atlas_gamer1_attack_ex_right;
+
+class PlayerGamer1 : public Player
+{
+public:
+	PlayerGamer1()
+	{
+		this->m_animation_idle_left.setAtlas(&atlas_gamer1_idle_left);
+		this->m_animation_idle_right.setAtlas(&atlas_gamer1_idle_right);
+		this->m_animation_run_left.setAtlas(&atlas_gamer1_run_left);
+		this->m_animation_run_right.setAtlas(&atlas_gamer1_run_right);
+		this->m_animation_attack_ex_left.setAtlas(&atlas_gamer1_attack_ex_left);
+		this->m_animation_attack_ex_right.setAtlas(&atlas_gamer1_attack_ex_right);
+
+		this->m_animation_idle_left.setInterval(75);
+		this->m_animation_idle_right.setInterval(75);
+		this->m_animation_run_left.setInterval(75);
+		this->m_animation_run_right.setInterval(75);
+		this->m_animation_attack_ex_left.setInterval(75);
+		this->m_animation_attack_ex_right.setInterval(75);
+
+		this->m_size.m_x = 96;
+		this->m_size.m_y = 96;
+
+		this->m_timer_attack_ex.setWaitTime(this->attack_ex_duration);
+		this->m_timer_attack_ex.setOneShot(true);
+		this->m_timer_attack_ex.setCallback([&]() {this->is_attacking_ex = false; });
+
+		this->m_timer_spawn_bullet_ex.setWaitTime(100);
+		this->m_timer_spawn_bullet_ex.setOneShot(false);
+		this->m_timer_spawn_bullet_ex.setCallback([&]() {this->spawnBullet1(this->speed_bullet_ex); });
+
+		this->m_attack_cd = 100;
+	}
+
+	~PlayerGamer1() = default;
+
+	virtual void on_update(int delta)
+	{
+		Player::on_update(delta);
+
+		if (this->is_attacking_ex)
+		{
+			main_camera.shake(5, 100);
+			this->m_timer_attack_ex.on_updata(delta);
+			this->m_timer_spawn_bullet_ex.on_updata(delta);
+		}
+	}
+
+	void spawnBullet1(float speed)
+	{
+		Bullet* bullet = new Gamer1Bullet();
+
+		Vector2 bullet_position, bullet_velocity;
+		const Vector2& bullet_size = bullet->getSize();
+
+		bullet_position.m_x = this->is_facing_right ? this->m_position.m_x + this->m_size.m_x - bullet_size.m_x / 2 : this->m_position.m_x - bullet_size.m_x / 2;
+		bullet_position.m_y = this->m_position.m_y;
+
+		bullet_velocity.m_x = this->is_facing_right ? speed : -speed;
+		bullet_velocity.m_y = 0;
+
+		bullet->setPosition(bullet_position.m_x, bullet_position.m_y);
+		bullet->setVelocity(bullet_velocity.m_x, bullet_velocity.m_y);
+
+		bullet->setCollideTarget(this->m_id == PlayerId::P1 ? PlayerId::P2 : PlayerId::P1);
+		bullet->setCallback([&]() {this->m_mp += 25; });
+
+		bullet_list.push_back(bullet);
+	}
+
+	void on_attack()
+	{
+		this->spawnBullet1(this->speed_bullet);
+
+		switch (rand() % 2)
+		{
+		case 0:
+			mciSendString(L"player gamer1_bullet_shoot_1 from 0", NULL, 0, NULL);
+			break;
+		case 1:
+			mciSendString(L"player gamer1_bullet_shoot_2 from 0", NULL, 0, NULL);
+			break;
+		}
+	}
+
+	void on_attack_ex()
+	{
+		this->is_attacking_ex = true;
+		this->m_timer_attack_ex.restart();
+
+		this->is_facing_right ? this->m_animation_attack_ex_right.reset() : this->m_animation_attack_ex_left.reset();
+
+		mciSendString(L"player gamer1_bullet_shoot_ex from 0", NULL, 0, NULL);
+
+	}
+
+private:
+	const float speed_bullet = 0.75f;
+	const float speed_bullet_ex = 1.5f;
+	const int attack_ex_duration = 2500;
+
+	Timer m_timer_attack_ex;
+	Timer m_timer_spawn_bullet_ex;
+
+};
+
+#endif // !_PLAYERGAMER1_H_
+
+```
+
+**playerGamer2.h**
+
+```
+#ifndef _PLAYERGAMER2_H_
+#define _PLAYERGAMER2_H_
+
+#include "player.h"
+#include "gamer2Bullet.h"
+#include "gamer2BulletEx.h"
+
+extern Atlas atlas_gamer2_idle_left;
+extern Atlas atlas_gamer2_idle_right;
+extern Atlas atlas_gamer2_run_left;
+extern Atlas atlas_gamer2_run_right;
+extern Atlas atlas_gamer2_attack_ex_left;
+extern Atlas atlas_gamer2_attack_ex_right;
+extern Atlas atlas_gamer2_bullet_text;
+
+extern Player* player_1;
+extern Player* player_2;
+
+class PlayerGamer2 : public Player
+{
+public:
+	PlayerGamer2()
+	{
+		this->m_animation_idle_left.setAtlas(&atlas_gamer2_idle_left);
+		this->m_animation_idle_right.setAtlas(&atlas_gamer2_idle_right);
+		this->m_animation_run_left.setAtlas(&atlas_gamer2_run_left);
+		this->m_animation_run_right.setAtlas(&atlas_gamer2_run_right);
+		this->m_animation_attack_ex_left.setAtlas(&atlas_gamer2_attack_ex_left);
+		this->m_animation_attack_ex_right.setAtlas(&atlas_gamer2_attack_ex_right);
+		this->m_animation_bullet_text.setAtlas(&atlas_gamer2_bullet_text);
+
+		this->m_animation_idle_left.setInterval(75);
+		this->m_animation_idle_right.setInterval(75);
+		this->m_animation_run_left.setInterval(75);
+		this->m_animation_run_right.setInterval(75);
+		this->m_animation_attack_ex_left.setInterval(100);
+		this->m_animation_attack_ex_right.setInterval(100);
+		this->m_animation_bullet_text.setInterval(100);
+
+		this->m_animation_attack_ex_left.setLoop(false);
+		this->m_animation_attack_ex_right.setLoop(false);
+		this->m_animation_bullet_text.setLoop(false);
+
+		this->m_animation_attack_ex_left.setCallBack([&]() { this->is_bullet_ex_visible = this->is_attacking_ex = false; });
+		this->m_animation_attack_ex_right.setCallBack([&]() { this->is_bullet_ex_visible = this->is_attacking_ex = false; });
+
+		this->m_size.m_x = 96;
+		this->m_size.m_y = 96;
+
+		this->m_attack_cd = 250;
+	}
+
+	~PlayerGamer2() = default;
+
+	virtual void on_update(int delta)
+	{
+		Player::on_update(delta);
+
+		if (this->is_bullet_ex_visible) this->m_animation_bullet_text.on_update(delta);
+	}
+	
+	virtual void on_draw(const Camera& camera)
+	{
+		Player::on_draw(camera);
+
+		if (this->is_bullet_ex_visible)
+		{
+			Vector2 text_position;
+			IMAGE* frame = this->m_animation_bullet_text.getFrame();
+
+			text_position.m_x = this->m_position.m_x - (this->m_size.m_x - frame->getwidth()) / 2;
+			text_position.m_y = this->m_position.m_y - frame->getheight();
+
+			this->m_animation_bullet_text.on_draw(camera, (int)text_position.m_x, (int)text_position.m_y);
+		}
+	}
+
+	void on_attack()
+	{
+		Bullet* bullet = new Gamer2Bullet();
+
+		Vector2 bullet_positon;
+		const Vector2& bullet_size = bullet->getSize();
+		bullet_positon.m_x = this->m_position.m_x + (this->m_size.m_x - bullet_size.m_x) / 2;
+		bullet_positon.m_y = this->m_position.m_y;
+
+		bullet->setPosition(bullet_positon.m_x, bullet_positon.m_y);
+		bullet->setVelocity(is_facing_right ? this->velocity_bullet.m_x : -this->velocity_bullet.m_x, this->velocity_bullet.m_y);
+
+		bullet->setCollideTarget(this->m_id == PlayerId::P1 ? PlayerId::P2 : PlayerId::P1);
+		bullet->setCallback([&]() { this->m_mp += 35; });
+
+		bullet_list.push_back(bullet);
+	}
+
+	void on_attack_ex()
+	{
+		this->is_attacking_ex = true;
+		this->is_bullet_ex_visible = true;
+
+		this->m_animation_bullet_text.reset();
+		this->is_facing_right ? this->m_animation_attack_ex_right.reset() : this->m_animation_attack_ex_right.reset();
+
+		Bullet* bullet = new Gamer2BulletEx();
+		Player* target = (this->m_id == PlayerId::P1 ? player_2 : player_1);
+
+		Vector2 bullet_position, bullet_velocity;
+		const Vector2& bullet_size = bullet->getSize();
+		const Vector2& target_size = target->getSize();
+		const Vector2& target_position = target->getPosition();
+
+		bullet_position.m_x = target_position.m_x + (target_size.m_x - bullet_size.m_x) / 2;
+		bullet_position.m_y = -this->m_size.m_y;
+		bullet_velocity.m_x = 0;
+		bullet_velocity.m_y = this->speed_bullet_ex;
+
+		bullet->setPosition(bullet_position.m_x, bullet_position.m_y);
+		bullet->setVelocity(bullet_velocity.m_x, bullet_velocity.m_y);
+
+		bullet->setCollideTarget(this->m_id == PlayerId::P1 ? PlayerId::P2 : PlayerId::P1);
+
+		bullet->setCallback([&]() {this->m_mp += 30; });
+
+		bullet_list.push_back(bullet);
+		mciSendString(L"player gamer2_bullet_text from 0", NULL, 0, NULL);
+	}
+
+private:
+	const float speed_bullet_ex = 0.15f;
+	const Vector2 velocity_bullet = { 0.25f, -0.5f };
+
+	bool is_bullet_ex_visible = false;//设置是否现实特殊攻击子弹顶部文本
+
+	Animation m_animation_bullet_text;
+
+};
+
+#endif // !_PLAYERGAMER2_H_
+```
+
+**main.cpp**
+
+```
+#include "atlas.h"
+#include "camera.h"
+
+#include "scene.h"
+#include "sceneManager.h"
+#include "menuScene.h"
+#include "gameScene.h"
+#include "selectorScene.h"
+
+#include "utils.h"
+#include "platform.h"
+#include "bullet.h"
+
+#include "player.h"
+#include "playerGamer1.h"
+#include "playerGamer2.h"
+
+#pragma comment(lib, "Winmm.lib")
+
+#include <graphics.h>
+#include <vector>
+
+const int FPS = 60;
+
+bool is_debug = false;
+
+Camera main_camera;
+
+std::vector<Platform> platform_list;
+std::vector<Bullet*> bullet_list;
+
+Player* player_1 = nullptr;
+Player* player_2 = nullptr;
+
+IMAGE img_menu_background;					//主菜单背景图片
+
+IMAGE img_VS;								//VS 艺术字图片
+IMAGE img_1P;								//1P 文本图片
+IMAGE img_2P;								//2P 文本图片
+IMAGE img_1P_desc;							//1P 键位描述图片
+IMAGE img_2P_desc;							//2P 键位描述图片
+IMAGE img_select_background_left;			//选人朝左背景图片
+IMAGE img_select_background_right;			//选人朝右背景图片
+IMAGE img_selector_tip;						//选人界面提示信息
+IMAGE img_selector_background;				//选人界面背景图
+IMAGE img_1P_selector_btn_idle_left;		//1P 向左选择按钮默认状态图片
+IMAGE img_1P_selector_btn_idle_right;		//1P 向右选择按钮默认状态图片
+IMAGE img_1P_selector_btn_down_left;		//1P 向左选择按钮按下状态图片
+IMAGE img_1P_selector_btn_down_right;		//1P 向右选择按钮按下状态图片
+IMAGE img_2P_selector_btn_idle_left;		//2P 向左选择按钮默认状态图片
+IMAGE img_2P_selector_btn_idle_right;		//2P 向右选择按钮默认状态图片
+IMAGE img_2P_selector_btn_down_left;		//2P 向左选择按钮按下状态图片
+IMAGE img_2P_selector_btn_down_right;		//2P 向右选择按钮按下状态图片
+IMAGE img_gamer1_selector_background_left;	//选人界面类型1朝左背景图片
+IMAGE img_gamer1_selector_background_right;	//选人界面类型1朝右背景图片
+IMAGE img_gamer2_selector_background_left;	//选人界面类型2朝左背景图片
+IMAGE img_gamer2_selector_background_right;	//选人界面类型2朝右背景图片
+
+IMAGE img_sky;								//填空图片
+IMAGE img_hills;							//山脉图片
+IMAGE img_platform_large;					//大型平台图片
+IMAGE img_platform_small;					//小型平台图片
+
+IMAGE img_1P_cursor;						//1P 指示光标图片
+IMAGE img_2P_cursor;						//2P 指示光标图片
+
+Atlas atlas_gamer1_idle_left;				//类型1向左默认动画图集
+Atlas atlas_gamer1_idle_right;				//类型1向右默认动画图集
+Atlas atlas_gamer1_run_left;				//类型1向左奔跑动画图集
+Atlas atlas_gamer1_run_right;				//类型1向右奔跑动画图集
+Atlas atlas_gamer1_attack_ex_left;			//类型1向左特殊攻击动画图集
+Atlas atlas_gamer1_attack_ex_right;			//类型1向右特殊攻击动画图集
+Atlas atlas_gamer1_die_left;				//类型1向左死亡动画图集
+Atlas atlas_gamer1_die_right;				//类型1向右死亡动画图集
+
+Atlas atlas_gamer2_idle_left;				//类型2向左默认动画图集
+Atlas atlas_gamer2_idle_right;				//类型2向右默认动画图集
+Atlas atlas_gamer2_run_left;				//类型2向左奔跑动画图集
+Atlas atlas_gamer2_run_right;				//类型2向右奔跑动画图集
+Atlas atlas_gamer2_attack_ex_left;			//类型2向左特殊攻击动画图集
+Atlas atlas_gamer2_attack_ex_right;			//类型2向右特殊攻击动画图集
+Atlas atlas_gamer2_die_left;				//类型2向左死亡动画图集
+Atlas atlas_gamer2_die_right;				//类型2向右死亡动画图集
+
+IMAGE img_gamer1_bullet;					//类型1子弹图片
+Atlas atlas_gamer1_bullet_break;			//类型1子弹破碎动画图集
+Atlas atlas_gemer2_bullet;					//类型2子弹动画图集
+Atlas atlas_gemer2_bullet_explode;			//类型2子弹爆炸动画图集
+Atlas atlas_gamer2_bullet_ex;				//类型2特殊类型子弹动画图集
+Atlas atlas_gamer2_bullet_ex_explode;		//类型2特殊类型子弹爆炸动画图集
+Atlas atlas_gamer2_bullet_text;				//类型2特殊类型子弹爆炸文本动画图集
+
+Atlas atlas_run_effect;						//奔跑特效动画图集
+Atlas atlas_jump_effect;					//跳跃特效动画图集
+Atlas atlas_land_effect;					//落地特效动画图集
+
+IMAGE img_winner_bar;						//获胜玩家背景图片
+IMAGE img_1P_winner;						//1P 获胜文本图片
+IMAGE img_2P_winner;						//2P 获胜文本图片
+
+IMAGE img_avatar_gamer1;					//类型1头像图片
+IMAGE img_avatar_gamer2;					//类型2头像图片
+
+Scene* menu_scene = nullptr;
+Scene* game_scene = nullptr;
+Scene* selector_scene = nullptr;
+
+SceneManager scene_manager;
+
+void flipAtlas(Atlas& src, Atlas& dst)
+{
+	dst.clear();
+	for (int i = 0; i < src.getSize(); i++)
+	{
+		IMAGE img_flpipped;
+		flipImage(src.getImage(i), &img_flpipped);
+		dst.addImage(img_flpipped);
+	}
+}
+
+void loadGameResources()
+{
+	AddFontResourceEx(L"./resources/HYPixel11pxU-2.ttf", FR_PRIVATE, NULL);
+
+	loadimage(&img_menu_background, L"./resources/menu_background.png");
+
+	loadimage(&img_VS, L"./resources/VS.png");
+	loadimage(&img_1P, L"./resources/1P.png");
+	loadimage(&img_2P, L"./resources/2P.png");
+	loadimage(&img_1P_desc, L"./resources/1P_desc.png");
+	loadimage(&img_2P_desc, L"./resources/2P_desc.png");
+	loadimage(&img_select_background_right, L"./resources/select_background.png");
+	flipImage(&img_select_background_right, &img_select_background_left);
+	loadimage(&img_selector_tip, L"./resources/selector_tip.png");
+	loadimage(&img_selector_background, L"./resources/selector_background.png");
+	loadimage(&img_1P_selector_btn_idle_right, L"./resources/1P_selector_btn_idle.png");
+	flipImage(&img_1P_selector_btn_idle_right, &img_1P_selector_btn_idle_left);
+	loadimage(&img_1P_selector_btn_down_right, L"./resources/1P_selector_btn_down.png");
+	flipImage(&img_1P_selector_btn_down_right, &img_1P_selector_btn_down_left);
+	loadimage(&img_2P_selector_btn_idle_right, L"./resources/2P_selector_btn_idle.png");
+	flipImage(&img_2P_selector_btn_idle_right, &img_2P_selector_btn_idle_left);
+	loadimage(&img_2P_selector_btn_down_right, L"./resources/2P_selector_btn_down.png");
+	flipImage(&img_2P_selector_btn_down_right, &img_2P_selector_btn_down_left);
+	loadimage(&img_gamer1_selector_background_right, L"./resources/gamer1_selector_background.png");
+	flipImage(&img_gamer1_selector_background_right, &img_gamer1_selector_background_left);
+	loadimage(&img_gamer2_selector_background_right, L"./resources/gamer2_selector_background.png");
+	flipImage(&img_gamer2_selector_background_right, &img_gamer2_selector_background_left);
+
+	loadimage(&img_sky, L"./resources/sky.png");
+	loadimage(&img_hills, L"./resources/hills.png");
+	loadimage(&img_platform_large, L"./resources/platform_large.png");
+	loadimage(&img_platform_small, L"./resources/platform_small.png");
+
+	loadimage(&img_1P_cursor, L"./resources/1P_cursor.png");
+	loadimage(&img_2P_cursor, L"./resources/2P_cursor.png");
+
+	atlas_gamer1_idle_right.loadFromFile(L"./resources/gamer1_idle_%d.png", 9);
+	flipAtlas(atlas_gamer1_idle_right, atlas_gamer1_idle_left);
+	atlas_gamer1_run_right.loadFromFile(L"./resources/gamer1_run_%d.png", 5);
+	flipAtlas(atlas_gamer1_run_right, atlas_gamer1_run_left);
+	atlas_gamer1_attack_ex_right.loadFromFile(L"./resources/gamer1_attack_ex_%d.png", 3);
+	flipAtlas(atlas_gamer1_attack_ex_right, atlas_gamer1_attack_ex_left);
+	atlas_gamer1_die_right.loadFromFile(L"./resources/gamer1_die_%d.png", 4);
+	flipAtlas(atlas_gamer1_die_right, atlas_gamer1_die_left);
+
+	atlas_gamer2_idle_right.loadFromFile(L"./resources/gamer2_idle_%d.png", 8);
+	flipAtlas(atlas_gamer2_idle_right, atlas_gamer2_idle_left);
+	atlas_gamer2_run_right.loadFromFile(L"./resources/gamer2_run_%d.png", 5);
+	flipAtlas(atlas_gamer2_run_right, atlas_gamer2_run_left);
+	atlas_gamer2_attack_ex_right.loadFromFile(L"./resources/gamer2_attack_ex_%d.png", 9);
+	flipAtlas(atlas_gamer2_attack_ex_right, atlas_gamer2_attack_ex_left);
+	atlas_gamer2_die_right.loadFromFile(L"./resources/gamer2_die_%d.png", 2);
+	flipAtlas(atlas_gamer2_die_right, atlas_gamer2_die_left);
+
+	loadimage(&img_gamer1_bullet, L"./resources/gamer1_bullet.png");
+	atlas_gamer1_bullet_break.loadFromFile(L"./resources/gamer1_bullet_break_%d.png", 3);
+	atlas_gemer2_bullet.loadFromFile(L"./resources/gamer2_bullet_%d.png", 5);
+	atlas_gemer2_bullet_explode.loadFromFile(L"./resources/gamer2_bullet_explode_%d.png", 5);
+	atlas_gamer2_bullet_ex.loadFromFile(L"./resources/gamer2_bullet_ex_%d.png", 5);
+	atlas_gamer2_bullet_ex_explode.loadFromFile(L"./resources/gamer2_bullet_ex_explode_%d.png", 5);
+	atlas_gamer2_bullet_text.loadFromFile(L"./resources/gamer2_bullet_text_%d.png", 6);
+
+	atlas_run_effect.loadFromFile(L"./resources/run_effect_%d.png", 4);
+	atlas_jump_effect.loadFromFile(L"./resources/jump_effect_%d.png", 5);
+	atlas_land_effect.loadFromFile(L"./resources/land_effect_%d.png", 2);
+
+	loadimage(&img_1P_winner, L"./resources/1P_winner.png");
+	loadimage(&img_2P_winner, L"./resources/2P_winner.png");
+	loadimage(&img_winner_bar, L"./resources/winner_bar.png");
+
+	loadimage(&img_avatar_gamer1, L"./resources/avatar_gamer1.png");
+	loadimage(&img_avatar_gamer2, L"./resources/avatar_gamer2.png");
+
+	mciSendString(L"open ./resources/bgm_game.mp3 alias bgm_game", NULL, 0, NULL);
+	mciSendString(L"open ./resources/bgm_menu.mp3 alias bgm_menu", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer1_bullet_break_1.mp3 alias gamer1_bullet_break_1", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer1_bullet_break_2.mp3 alias gamer1_bullet_break_2", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer1_bullet_break_3.mp3 alias gamer1_bullet_break_3", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer1_bullet_shoot_1.mp3 alias gamer1_bullet_shoot_1", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer1_bullet_shoot_2.mp3 alias gamer1_bullet_shoot_2", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer1_bullet_shoot_ex.mp3 alias gamer1_bullet_shoot_ex", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer2_bullet_explode.mp3 alias gamer2_bullet_explode", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer2_bullet_explode_ex.mp3 alias gamer2_bullet_explode_ex", NULL, 0, NULL);
+	mciSendString(L"open ./resources/gamer2_bullet_text.mp3 alias gamer2_bullet_text", NULL, 0, NULL);
+	mciSendString(L"open ./resources/ui_confirm.wav alias ui_confirm", NULL, 0, NULL);
+	mciSendString(L"open ./resources/ui_switch.wav alias ui_switch", NULL, 0, NULL);
+	mciSendString(L"open ./resources/ui_win.wav alias ui_win", NULL, 0, NULL);
+
+	return;
+}
+
+int main()
+{
+	ExMessage msg;
+
+	loadGameResources();
+	
+	initgraph(1200, 720);
+
+	menu_scene = new MenuScene();
+	game_scene = new GameScene();
+	selector_scene = new SelectorScene();
+
+	scene_manager.setCurrentState(menu_scene);
+
+	settextstyle(28, 0, L"HYPixel11pxU-2.ttf");
+	setbkmode(TRANSPARENT);
+
+	BeginBatchDraw();
+	while (true)
+	{
+		DWORD frame_start_time = GetTickCount();
+
+		while (peekmessage(&msg))
+		{
+			scene_manager.on_input(msg);
+		}
+
+		static DWORD last_tick_time = GetTickCount();
+		DWORD current_tick_time = GetTickCount();
+		DWORD delta_tick_time = current_tick_time - last_tick_time;
+		scene_manager.on_updata(delta_tick_time);
+		last_tick_time = current_tick_time;
+
+		cleardevice();
+		scene_manager.on_draw(main_camera);
+
+		FlushBatchDraw();
+
+		DWORD frame_end_time = GetTickCount();
+		DWORD frame_delta_time = frame_end_time - frame_start_time;
+		if (frame_delta_time < 1000 / FPS)
+		{
+			Sleep(1000 / FPS - frame_delta_time);
+		}
+
+	}
+	EndBatchDraw();
+
+	return 0;
+}
+```
+
+
+
+## 第十四节
+
+### 子弹发射更新与渲染补全
+
+上一节完成了玩家层逻辑部分，所以接下来就需要从场景层调用之前编写好的方法了，首先来到GameScene.h中编写on_update与on_draw方法，将摄像机更新以及子弹进行渲染更新，
+
+```
+//on_update增加代码
+
+```
 
