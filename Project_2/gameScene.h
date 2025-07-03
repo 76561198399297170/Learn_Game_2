@@ -86,10 +86,7 @@ public:
 		putImageAlpha(camera, this->pos_img_sky.x, this->pos_img_sky.y, &img_sky);
 		putImageAlpha(camera, this->pos_img_hills.x, this->pos_img_hills.y, &img_hills);
 
-		for (const Platform& p : platform_list)
-		{
-			p.on_draw(camera);
-		}
+		for (const Platform& p : platform_list) p.on_draw(camera);
 
 		player_1->on_draw(camera);
 		player_2->on_draw(camera);

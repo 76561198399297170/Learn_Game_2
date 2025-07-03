@@ -31,7 +31,7 @@ public:
 	{
 	}
 
-	virtual void on_draw(const Camera& camera)
+	virtual void on_draw(const Camera& camera) const
 	{
 	}
 

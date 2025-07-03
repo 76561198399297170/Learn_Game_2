@@ -9,6 +9,7 @@
 
 #include "utils.h"
 #include "platform.h"
+#include "bullet.h"
 
 #include "player.h"
 #include "playerGamer1.h"
@@ -26,6 +27,7 @@ bool is_debug = false;
 Camera main_camera;
 
 std::vector<Platform> platform_list;
+std::vector<Bullet*> bullet_list;
 
 Player* player_1 = nullptr;
 Player* player_2 = nullptr;
@@ -170,7 +172,7 @@ void loadGameResources()
 	atlas_gamer2_die_right.loadFromFile(L"./resources/gamer2_die_%d.png", 2);
 	flipAtlas(atlas_gamer2_die_right, atlas_gamer2_die_left);
 
-	loadimage(&img_gamer1_bullet, L"./resources/gamer_bullet.png");
+	loadimage(&img_gamer1_bullet, L"./resources/gamer1_bullet.png");
 	atlas_gamer1_bullet_break.loadFromFile(L"./resources/gamer1_bullet_break_%d.png", 3);
 	atlas_gemer2_bullet.loadFromFile(L"./resources/gamer2_bullet_%d.png", 5);
 	atlas_gemer2_bullet_explode.loadFromFile(L"./resources/gamer2_bullet_explode_%d.png", 5);

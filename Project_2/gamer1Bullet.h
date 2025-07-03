@@ -45,7 +45,7 @@ public:
 
 	void on_draw(const Camera& camera) const
 	{
-		if (this->can_remove)
+		if (this->is_valid)
 		{
 			putImageAlpha(camera, (int)this->m_position.m_x, (int)this->m_position.m_y, &img_gamer1_bullet);
 		}

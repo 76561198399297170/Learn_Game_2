@@ -6,10 +6,12 @@
 #include "animation.h"
 #include "playerId.h"
 #include "platform.h"
+#include "bullet.h"
 
 #include <graphics.h>
 
 extern std::vector<Platform> platform_list;
+extern std::vector<Bullet*> bullet_list;
 
 class Player
 {
@@ -27,6 +29,16 @@ public:
 
 	virtual void on_update(int delta)
 	{
+		if (this->is_attack_keydown)
+		{
+			if (this->can_attack)
+			{
+				this->on_attack();
+				this->can_attack = false;
+				this->m_timer_attack_cd.restart();
+			}
+		}
+
 		int direction = this->is_right_keydown - this->is_left_keydown;
 
 		if (direction != 0)
@@ -137,26 +149,19 @@ public:
 			break;
 		}
 
-		if (this->is_attack_keydown)
-		{
-			if (this->can_attack)
-			{
-				this->on_attack();
-				this->can_attack = false;
-				this->m_timer_attack_cd.restart();
-			}
-		}
 	}
 
 	void on_jump()
 	{
-		if (this->m_velocity.m_y != 0) return;
+		if (this->m_velocity.m_y != 0 || this->is_attacking_ex) return;
 
 		this->m_velocity.m_y += this->jump_velocity;
 	}
 
 	void on_run(float destance) 
 	{
+		if (this->is_attacking_ex) return;
+
 		this->m_position.m_x += destance;
 	}
 
@@ -194,6 +199,10 @@ public:
 
 	void setPosition(int x, int y) { this->m_position.m_x = x, this->m_position.m_y = y; }
 
+	const Vector2& getPosition() const { return this->m_position; }
+
+	const Vector2& getSize() const { return this->m_size; }
+
 	virtual void on_attack() {}
 
 	virtual void on_attack_ex() {}
@@ -210,6 +219,8 @@ protected:
 	Animation m_animation_idle_right;
 	Animation m_animation_run_left;
 	Animation m_animation_run_right;
+	Animation m_animation_attack_ex_left;
+	Animation m_animation_attack_ex_right;
 
 	Animation* m_current_animaiton = nullptr;
 
@@ -225,6 +236,8 @@ protected:
 	bool is_facing_right = true;
 
 	bool is_attack_keydown = false;
+	bool is_attacking_ex = false;
+
 	bool can_attack = true;
 	int m_attack_cd = 500;
 	Timer m_timer_attack_cd;
