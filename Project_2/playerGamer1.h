@@ -87,10 +87,10 @@ public:
 		switch (rand() % 2)
 		{
 		case 0:
-			mciSendString(L"player gamer1_bullet_shoot_1 from 0", NULL, 0, NULL);
+			mciSendString(L"play gamer1_bullet_shoot_1 from 0", NULL, 0, NULL);
 			break;
 		case 1:
-			mciSendString(L"player gamer1_bullet_shoot_2 from 0", NULL, 0, NULL);
+			mciSendString(L"play gamer1_bullet_shoot_2 from 0", NULL, 0, NULL);
 			break;
 		}
 	}
@@ -100,10 +100,9 @@ public:
 		this->is_attacking_ex = true;
 		this->m_timer_attack_ex.restart();
 
+		mciSendString(L"play gamer1_bullet_shoot_ex from 500", NULL, 0, NULL);
+
 		this->is_facing_right ? this->m_animation_attack_ex_right.reset() : this->m_animation_attack_ex_left.reset();
-
-		mciSendString(L"player gamer1_bullet_shoot_ex from 0", NULL, 0, NULL);
-
 	}
 
 private:

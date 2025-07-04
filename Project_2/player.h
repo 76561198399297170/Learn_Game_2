@@ -111,6 +111,9 @@ public:
 				case 0x46://'F'
 					this->is_attack_keydown = true;
 					break;
+				case 0x47://'G'
+					if (this->m_mp >= 100) this->m_mp = 0, this->on_attack_ex();
+					break;
 				}
 				break;
 			case PlayerId::P2:
@@ -149,9 +152,6 @@ public:
 					break;
 				case 0x46://'F'
 					this->is_attack_keydown = false;
-					break;
-				case 0x47:///'G'
-					if (this->m_mp >= 100) this->m_mp = 0, this->on_attack_ex();
 					break;
 				}
 				break;

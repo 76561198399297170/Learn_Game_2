@@ -122,7 +122,7 @@ public:
 		bullet->setCallback([&]() {this->m_mp += 30; });
 
 		bullet_list.push_back(bullet);
-		mciSendString(L"player gamer2_bullet_text from 0", NULL, 0, NULL);
+		mciSendString(L"play gamer2_bullet_text from 0", NULL, 0, NULL);
 	}
 
 private:
