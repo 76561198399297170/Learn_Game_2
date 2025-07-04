@@ -7967,6 +7967,9 @@ virtual void on_input(const ExMessage& msg)
 			case 0x46://'F'
 				this->is_attack_keydown = true;
 				break;
+			case 0x47://'G'
+				if (this->m_mp >= 100) this->m_mp = 0, this->on_attack_ex();
+				break;
 			}
 			break;
 		case PlayerId::P2:
@@ -8005,9 +8008,6 @@ virtual void on_input(const ExMessage& msg)
 				break;
 			case 0x46://'F'
 				this->is_attack_keydown = false;
-				break;
-			case 0x47:///'G'
-				if (this->m_mp >= 100) this->m_mp = 0, this->on_attack_ex();
 				break;
 			}
 			break;
@@ -8099,10 +8099,10 @@ void on_attack()
 	switch (rand() % 2)
 	{
 	case 0:
-		mciSendString(L"player gamer1_bullet_shoot_1 from 0", NULL, 0, NULL);
+		mciSendString(L"play gamer1_bullet_shoot_1 from 0", NULL, 0, NULL);
 		break;
 	case 1:
-		mciSendString(L"player gamer1_bullet_shoot_2 from 0", NULL, 0, NULL);
+		mciSendString(L"play gamer1_bullet_shoot_2 from 0", NULL, 0, NULL);
 		break;
 	}
 }
@@ -8173,6 +8173,8 @@ void on_attack_ex()
 {
     this->is_attacking_ex = true;
     this->m_timer_attack_ex.restart();
+    
+	mciSendString(L"play gamer1_bullet_shoot_ex from 500", NULL, 0, NULL);
 }
 
 //playerGamer1.h构造方法初始化
@@ -8333,6 +8335,7 @@ void on_attack_ex()
 	bullet->setCallback([&]() {this->m_mp += 30; });
 
 	bullet_list.push_back(bullet);
+	mciSendString(L"play gamer2_bullet_text from 0", NULL, 0, NULL);
 }
 
 ```
@@ -8433,6 +8436,9 @@ public:
 				case 0x46://'F'
 					this->is_attack_keydown = true;
 					break;
+				case 0x47://'G'
+					if (this->m_mp >= 100) this->m_mp = 0, this->on_attack_ex();
+					break;
 				}
 				break;
 			case PlayerId::P2:
@@ -8471,9 +8477,6 @@ public:
 					break;
 				case 0x46://'F'
 					this->is_attack_keydown = false;
-					break;
-				case 0x47:///'G'
-					if (this->m_mp >= 100) this->m_mp = 0, this->on_attack_ex();
 					break;
 				}
 				break;
@@ -8685,10 +8688,10 @@ public:
 		switch (rand() % 2)
 		{
 		case 0:
-			mciSendString(L"player gamer1_bullet_shoot_1 from 0", NULL, 0, NULL);
+			mciSendString(L"play gamer1_bullet_shoot_1 from 0", NULL, 0, NULL);
 			break;
 		case 1:
-			mciSendString(L"player gamer1_bullet_shoot_2 from 0", NULL, 0, NULL);
+			mciSendString(L"play gamer1_bullet_shoot_2 from 0", NULL, 0, NULL);
 			break;
 		}
 	}
@@ -8698,10 +8701,9 @@ public:
 		this->is_attacking_ex = true;
 		this->m_timer_attack_ex.restart();
 
+		mciSendString(L"play gamer1_bullet_shoot_ex from 500", NULL, 0, NULL);
+
 		this->is_facing_right ? this->m_animation_attack_ex_right.reset() : this->m_animation_attack_ex_left.reset();
-
-		mciSendString(L"player gamer1_bullet_shoot_ex from 0", NULL, 0, NULL);
-
 	}
 
 private:
@@ -8845,7 +8847,7 @@ public:
 		bullet->setCallback([&]() {this->m_mp += 30; });
 
 		bullet_list.push_back(bullet);
-		mciSendString(L"player gamer2_bullet_text from 0", NULL, 0, NULL);
+		mciSendString(L"play gamer2_bullet_text from 0", NULL, 0, NULL);
 	}
 
 private:
@@ -9765,6 +9767,9 @@ public:
 				case 0x46://'F'
 					this->is_attack_keydown = true;
 					break;
+				case 0x47://'G'
+					if (this->m_mp >= 100) this->m_mp = 0, this->on_attack_ex();
+					break;
 				}
 				break;
 			case PlayerId::P2:
@@ -9803,9 +9808,6 @@ public:
 					break;
 				case 0x46://'F'
 					this->is_attack_keydown = false;
-					break;
-				case 0x47:///'G'
-					if (this->m_mp >= 100) this->m_mp = 0, this->on_attack_ex();
 					break;
 				}
 				break;
