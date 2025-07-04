@@ -61,7 +61,7 @@ public:
 	void spawnBullet1(float speed)
 	{
 		Bullet* bullet = new Gamer1Bullet();
-
+		
 		Vector2 bullet_position, bullet_velocity;
 		const Vector2& bullet_size = bullet->getSize();
 

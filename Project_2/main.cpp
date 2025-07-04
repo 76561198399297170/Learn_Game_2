@@ -32,6 +32,9 @@ std::vector<Bullet*> bullet_list;
 Player* player_1 = nullptr;
 Player* player_2 = nullptr;
 
+IMAGE* img_player_1_avatar = nullptr;
+IMAGE* img_player_2_avatar = nullptr;
+
 IMAGE img_menu_background;					//主菜单背景图片
 
 IMAGE img_VS;								//VS 艺术字图片

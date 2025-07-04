@@ -147,6 +147,7 @@
     <ClInclude Include="scene.h" />
     <ClInclude Include="sceneManager.h" />
     <ClInclude Include="selectorScene.h" />
+    <ClInclude Include="statusBar.h" />
     <ClInclude Include="timer.h" />
     <ClInclude Include="utils.h" />
     <ClInclude Include="vector2.h" />

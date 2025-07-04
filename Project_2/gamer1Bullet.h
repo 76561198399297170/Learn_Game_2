@@ -53,13 +53,15 @@ public:
 		{
 			this->m_animation_bullet_break.on_draw(camera, (int)this->m_position.m_x, (int)this->m_position.m_y);
 		}
+
+		Bullet::on_draw(camera);
 	}
 
 	void on_update(int delta)
 	{
 		this->m_position += this->m_velocity * (float)delta;
 
-		if (this->is_valid)
+		if (!this->is_valid)
 		{
 			this->m_animation_bullet_break.on_update(delta);
 		}

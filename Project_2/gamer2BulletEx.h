@@ -53,7 +53,7 @@ public:
 	}
 
 	void on_draw(const Camera& camera) const
-	{
+	{ 
 		if (this->is_valid)
 		{
 			this->m_animation_idle.on_draw(camera, this->m_position.m_x, this->m_position.m_y);
@@ -62,6 +62,7 @@ public:
 		{
 			this->m_animation_explode.on_draw(camera, this->m_position.m_x + this->m_explode_render_offset.m_x, this->m_position.m_y + this->m_explode_render_offset.m_y);
 		}
+		Bullet::on_draw(camera);
 	}
 
 	void on_update(int delta)

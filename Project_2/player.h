@@ -13,12 +13,21 @@
 extern std::vector<Platform> platform_list;
 extern std::vector<Bullet*> bullet_list;
 
+extern bool is_debug;
+
 class Player
 {
 public:
 	Player()
 	{
 		this->m_current_animaiton = &this->m_animation_idle_right;
+
+		this->m_timer_invulnerable.setWaitTime(750);
+		this->m_timer_invulnerable.setOneShot(true);
+		this->m_timer_invulnerable.setCallback([&]() { this->is_invulnerable = false; });
+
+		this->m_timer_invulnerable_blink.setWaitTime(75);
+		this->m_timer_invulnerable_blink.setCallback([&]() {this->is_show_sketch_frame = !this->is_show_sketch_frame; });
 
 		this->m_timer_attack_cd.setWaitTime(this->m_attack_cd);
 		this->m_timer_attack_cd.setOneShot(true);
@@ -43,26 +52,41 @@ public:
 
 		if (direction != 0)
 		{
-			this->is_facing_right = direction > 0;
+			if (!this->is_attacking_ex) this->is_facing_right = direction > 0;
+
 			this->m_current_animaiton = is_facing_right ? &this->m_animation_run_right : &this->m_animation_run_left;
 			
 			float distance = direction * this->run_velocity * delta;
 			this->on_run(distance);
-
 		}
 		else
 		{
 			this->m_current_animaiton = is_facing_right ? &this->m_animation_idle_right : &this->m_animation_idle_left;
 		}
 
+		if (this->is_attacking_ex) this->m_current_animaiton = this->is_facing_right ? &this->m_animation_attack_ex_right : &this->m_animation_attack_ex_left;
+
 		this->m_current_animaiton->on_update(delta);
+
 		this->m_timer_attack_cd.on_updata(delta);
+		this->m_timer_invulnerable.on_updata(delta);
+		this->m_timer_invulnerable_blink.on_updata(delta);
+		
+		if (this->is_show_sketch_frame) sketchImage(this->m_current_animaiton->getFrame(), &this->m_img_sketch);
+
 		this->moveAndCollide(delta);
 	}
 
 	virtual void on_draw(const Camera& camera)
 	{
-		this->m_current_animaiton->on_draw(camera, this->m_position.m_x, this->m_position.m_y);
+		if (this->m_hp > 0 && this->is_invulnerable && this->is_show_sketch_frame) putImageAlpha(camera, (int)this->m_position.m_x, (int)this->m_position.m_y, &this->m_img_sketch);
+		else this->m_current_animaiton->on_draw(camera, this->m_position.m_x, this->m_position.m_y);
+
+		if (is_debug)
+		{
+			setlinecolor(RGB(0, 125, 255));
+			rectangle((int)this->m_position.m_x, (int)this->m_position.m_y, (int)(this->m_position.m_x + this->m_size.m_x), (int)(this->m_position.m_y + this->m_size.m_y));
+		}
 	}
 
 	virtual void on_input(const ExMessage& msg)
@@ -193,6 +217,30 @@ public:
 				}
 			}
 		}
+
+		if (!this->is_invulnerable)
+		{
+			for (Bullet* b : bullet_list)
+			{
+				if (!b->getValid() || b->getCollideTarget() != this->m_id) continue;
+
+				if (b->checkCollide(this->m_position, this->m_size))
+				{
+					this->makeInvulnerable();
+
+					b->on_collide();
+					b->setValid(false);
+
+					this->m_hp -= b->getDamage();
+				}
+			}
+		}
+	}
+
+	void makeInvulnerable()
+	{
+		this->is_invulnerable = true;
+		this->m_timer_invulnerable.restart();
 	}
 
 	void setId(PlayerId id) { this->m_id = id; }
@@ -202,6 +250,10 @@ public:
 	const Vector2& getPosition() const { return this->m_position; }
 
 	const Vector2& getSize() const { return this->m_size; }
+
+	const int getHp() const { return this->m_hp; }
+
+	const int getMp() const { return this->m_mp; }
 
 	virtual void on_attack() {}
 
@@ -226,9 +278,14 @@ protected:
 
 	PlayerId m_id;
 
+	IMAGE m_img_sketch;
+
 	const float run_velocity = 0.55f;//水平移动速度
 	const float gravity = 0.0016f;//重力加速度
 	const float jump_velocity = -0.85f;//跳跃速度
+
+	bool is_invulnerable = false;
+	bool is_show_sketch_frame = false;
 
 	bool is_left_keydown = false;
 	bool is_right_keydown = false;
@@ -240,7 +297,10 @@ protected:
 
 	bool can_attack = true;
 	int m_attack_cd = 500;
+
 	Timer m_timer_attack_cd;
+	Timer m_timer_invulnerable;
+	Timer m_timer_invulnerable_blink;
 
 };
 

@@ -8,6 +8,8 @@
 #include <functional>
 #include <graphics.h>
 
+extern bool is_debug;
+
 class Bullet
 {
 public:
@@ -33,6 +35,14 @@ public:
 
 	virtual void on_draw(const Camera& camera) const
 	{
+		if (is_debug)
+		{
+			setfillcolor((RGB(255, 255, 255)));
+			setlinecolor((RGB(255, 255, 255)));
+
+			rectangle((int)this->m_position.m_x, (int)this->m_position.m_y, (int)this->m_position.m_x + this->m_size.m_x, (int)this->m_position.m_y + this->m_size.m_y);
+			solidcircle((int)this->m_position.m_x + this->m_size.m_x / 2, (int)this->m_position.m_y + this->m_size.m_y / 2, 5);
+		}
 	}
 
 	int getDamage() { return this->m_damage; }
@@ -45,7 +55,7 @@ public:
 
 	bool getValid() { return this->is_valid; }
 
-	bool checkCanRemove() { return this->can_remove; }
+	bool checkCanRemove() const { return this->can_remove; }
 
 	void setCallback(std::function<void()> callback) { this->m_callback = callback; }
 

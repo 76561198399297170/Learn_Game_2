@@ -6,8 +6,7 @@
 #include "scene.h"
 #include "sceneManager.h"
 #include "player.h"
-
-#include <iostream>
+#include "statusBar.h"
 
 extern Player* player_1;
 extern Player* player_2;
@@ -17,9 +16,13 @@ extern IMAGE img_hills;
 extern IMAGE img_platform_large;
 extern IMAGE img_platform_small;
 
+extern IMAGE* img_player_1_avatar;
+extern IMAGE* img_player_2_avatar;
+
 extern Camera main_camera;
 
 extern std::vector<Platform> platform_list;
+extern std::vector<Bullet*> bullet_list;
 
 extern SceneManager scene_manager;
 
@@ -31,6 +34,12 @@ public:
 
 	virtual void on_enter()
 	{
+		this->m_status_bar_1P.setAvatar(img_player_1_avatar);
+		this->m_status_bar_2P.setAvatar(img_player_2_avatar);
+
+		this->m_status_bar_1P.setPosition(235, 625);
+		this->m_status_bar_2P.setPosition(675, 625);
+
 		player_1->setPosition(200, 50);
 		player_2->setPosition(975, 50);
 
@@ -79,6 +88,24 @@ public:
 	{
 		player_1->on_update(delta);
 		player_2->on_update(delta);
+
+		main_camera.on_updata(delta);
+
+		bullet_list.erase(std::remove_if(bullet_list.begin(), bullet_list.end(), 
+			[](const Bullet* b)
+			{
+				bool deletable = b->checkCanRemove();
+				if (deletable) delete b;
+				return deletable;
+			}), 
+			bullet_list.end());
+
+		for (Bullet* b : bullet_list) b->on_update(delta);
+
+		this->m_status_bar_1P.setHp(player_1->getHp());
+		this->m_status_bar_1P.setMp(player_1->getMp());
+		this->m_status_bar_2P.setHp(player_2->getHp());
+		this->m_status_bar_2P.setMp(player_2->getMp());
 	}
 
 	virtual void on_draw(const Camera& camera) 
@@ -90,6 +117,11 @@ public:
 
 		player_1->on_draw(camera);
 		player_2->on_draw(camera);
+
+		for (const Bullet* b : bullet_list) b->on_draw(camera);
+
+		this->m_status_bar_1P.on_draw();
+		this->m_status_bar_2P.on_draw();
 	}
 
 	virtual void on_input(const ExMessage& msg)
@@ -121,6 +153,9 @@ public:
 private:
 	POINT pos_img_sky = { 0 };
 	POINT pos_img_hills = { 0 };
+
+	StatusBar m_status_bar_1P;
+	StatusBar m_status_bar_2P;
 
 };
 

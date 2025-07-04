@@ -92,5 +92,8 @@
     <ClInclude Include="gamer2Bullet.h">
       <Filter>头文件\bullet</Filter>
     </ClInclude>
+    <ClInclude Include="statusBar.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

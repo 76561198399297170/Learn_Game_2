@@ -45,6 +45,9 @@ extern IMAGE img_avatar_gamer2;
 
 extern SceneManager scene_manager;
 
+extern IMAGE* img_player_1_avatar;
+extern IMAGE* img_player_2_avatar;
+
 class SelectorScene : public Scene
 {
 public:
@@ -249,9 +252,11 @@ public:
 		{
 		case PlayerType::Gamer1:
 			player_1 = new PlayerGamer1();
+			img_player_1_avatar = &img_avatar_gamer1;
 			break;
 		case PlayerType::Gamer2:
 			player_1 = new PlayerGamer2();
+			img_player_1_avatar = &img_avatar_gamer2;
 			break;
 		}
 		player_1->setId(PlayerId::P1);
@@ -260,9 +265,11 @@ public:
 		{
 		case PlayerType::Gamer1:
 			player_2 = new PlayerGamer1();
+			img_player_2_avatar = &img_avatar_gamer1;
 			break;
 		case PlayerType::Gamer2:
 			player_2 = new PlayerGamer2();
+			img_player_2_avatar = &img_avatar_gamer2;
 			break;
 		}
 		player_2->setId(PlayerId::P2);
