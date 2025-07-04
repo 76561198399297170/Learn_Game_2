@@ -7189,7 +7189,7 @@ public:
 
 	bool getValid() { return this->is_valid; }
 
-	bool checkCanRemove() { return this->can_remove; }
+	bool checkCanRemove() const { return this->can_remove; }
 
 	void setCallback(std::function<void()> callback) { this->m_callback = callback; }
 
@@ -7283,7 +7283,7 @@ public:
 
 	bool getValid() { return this->is_valid; }
 
-	bool checkCanRemove() { return this->can_remove; }
+	bool checkCanRemove() const { return this->can_remove; }
 
 	void setCallback(std::function<void()> callback) { this->m_callback = callback; }
 
@@ -7400,7 +7400,7 @@ public:
 	{
 		this->m_position += this->m_velocity * (float)delta;
 
-		if (this->is_valid)
+		if (!this->is_valid)
 		{
 			this->m_animation_bullet_break.on_update(delta);
 		}
@@ -7694,7 +7694,7 @@ public:
 	{
 		this->m_position += this->m_velocity * (float)delta;
 
-		if (this->is_valid)
+		if (!this->is_valid)
 		{
 			this->m_animation_bullet_break.on_update(delta);
 		}
@@ -9133,10 +9133,1384 @@ int main()
 
 ### 子弹发射更新与渲染补全
 
-上一节完成了玩家层逻辑部分，所以接下来就需要从场景层调用之前编写好的方法了，首先来到GameScene.h中编写on_update与on_draw方法，将摄像机更新以及子弹进行渲染更新，
+上一节完成了玩家层逻辑部分，所以接下来就需要从场景层调用之前编写好的方法了，首先来到GameScene.h中引入资源并编写on_update与on_draw方法，将摄像机更新以及子弹进行渲染更新，同时我们希望当角色处于特殊攻击时不允许水平转向，所以为is_faceing_right变量赋值之前先判断是否处于特殊攻击，随后在当前特殊攻击状态切换玩家当前动画，绘制方面注意顺序我们一般将子弹绘制在玩家上方，所以应该先绘制角色再绘制子弹，运行测试能够正确生成子弹与渲染更新。
 
 ```
-//on_update增加代码
+//全局引用资源
+extern std::vector<Bullet*> bullet_list;
+
+//on_update增加转向禁止代码
+if (!this->is_attacking_ex) this->is_facing_right = direction > 0;
+
+//on_update增加子弹与动画更新代码
+for (Bullet* b: bullet_list) b->on_update(delta);
+main_camera.update(delta);
+
+if (this->is_attacking_ex) this->m_current_animaiton = this->is_facing_right ? &this->m_animation_attack_ex_right : &this->m_animation_attack_ex_left;
+
+//on_draw添加代码
+for (const Bullet* b: bullet_list) b->on_draw(camera);
 
 ```
 
+
+
+接下来添加子弹与玩家碰撞逻辑，在player.h中moveAndCollide玩家与场景中平台物理碰撞完成后遍历场景子弹对象是否可以与玩家发生碰撞以及碰撞目标是否与当前玩家匹配，不是则直接跳过，随后通过定义好的方法传入玩家位置与尺寸，若发生碰撞则调用子弹碰撞并修改子弹存活减少玩家生命即可。
+
+来到gameScene.h中添加在on_update中的子弹删除逻辑，使用vector提供的erase方法配合remove_if函数以遍历每个子弹，在判断的lambda中检查是否可被删除，随后释放可被删除的内存返回是否可被删除的值来让更上层决定是否删除指针本身
+
+```
+//player.h成员函数moveAndCollide添加子弹碰撞检测
+for (Bullet* b : bullet_list)
+{
+	if (!b->getValid() || b->getCollideTarget() != this->m_id) continue;
+	
+	if (b->checkCollide(this->m_position, this->m_size))
+	{
+		b->on_collide();
+		b->setValid(false);
+
+		this->m_hp -= b->getDamage();
+	}
+}
+
+//gameScene.h成员函数on_update添加子弹移除
+bullet_list.erase(std::remove_if(bullet_list.begin(), bullet_list.end(), 
+	[](const Bullet* b)
+	{
+		bool deletable = b->checkCanRemove();
+		if (deletable) delete b;
+		return deletable;
+	}), 
+	bullet_list.end());
+
+```
+
+
+
+### 玩家受击短暂无敌帧
+
+来到player.h中定义两个变量is_invulnerable与is_show_sketch_frame标识角色角色是否处于无敌以及当前帧是否应该显示剪影，再添加两个定时器m_timer_invulnerable与m_timer_invulnerable_blink表示无敌状态定时与闪烁定时，这样就只要在构造函数中设定计时器无敌时间750毫秒，剪影75毫秒切换一次即可，继续on_update中增加两定时器更新。
+
+```
+//成员变量增加
+bool is_invulnerable = false;
+bool is_show_sketch_frame = false;
+Timer m_timer_invulnerable;
+Timer m_timer_invulnerable_blink;
+
+//构造函数设定定时器
+this->m_timer_invulnerable.setWaitTime(750);
+this->m_timer_invulnerable.setOneShot(true);
+this->m_timer_invulnerable.setCallback([&]() { this->is_invulnerable = false; });
+
+this->m_timer_invulnerable_blink.setWaitTime(75);
+this->m_timer_invulnerable_blink.setCallback([&]() {this->is_show_sketch_frame = !this->is_show_sketch_frame; });
+
+//on_update更新定时器
+this->m_timer_invulnerable.on_updata(delta);
+this->m_timer_invulnerable_blink.on_updata(delta);
+
+```
+
+
+
+由于我们需要纯白剪影，所以在utils.h中，新增sketchImage函数，将图片处理纯白剪影效果工具函数完成。
+
+```
+//新增工具函数
+inline void sketchImage(IMAGE* src, IMAGE* dst)
+{
+	int w = src->getwidth();
+	int h = src->getheight();
+
+	Resize(dst, w, h);
+	DWORD* src_buffer = GetImageBuffer(src);
+	DWORD* dst_buffer = GetImageBuffer(dst);
+	for (int y = 0; y < h; y++)
+	{
+		for (int x = 0; x < w; x++) 
+		{
+			int idx = y * w + x;
+			dst_buffer[idx] = BGR(RGB(255, 255, 255) | (src_buffer[idx] & 0xFF000000));
+		}
+	}
+}
+```
+
+
+
+回到player.h中存储角色剪影声明定义一个IMAGE类型img_sketch变量，随后在on_update只需判断当前帧会否需要剪影效果，若需要则处理剪影效果保存到定义的变量中，随后on_draw中根据情况绘制即可
+
+```
+//添加成员变量
+IMAGE img_sketch;
+
+//on_update添加代码
+if (this->is_show_sketch_frame) sketchImage(this->m_current_animaiton->getFrame(), &this->m_img_sketch);
+
+//on_draw添加代码
+if (this->m_hp > 0 && this->is_invulnerable && this->is_show_sketch_frame) putImageAlpha(camera, (int)this->m_position.m_x, (int)this->m_position.m_y, &this->m_img_sketch);
+else this->m_current_animaiton->on_draw(camera, this->m_position.m_x, this->m_position.m_y);
+
+```
+
+
+
+如此就可以开始完成无敌状态逻辑入口了，在Player类中编写进入无敌状态方法makeInvulnerable方法，内部逻辑首先设置无敌状态为true并重置定时器，并在碰撞后设置当前角色无敌状态，并且要注意其碰撞前提添加非无敌状态才会进行碰撞。
+
+```
+//添加函数
+void makeInvulnerable()
+{
+	this->is_invulnerable = true;
+	this->m_timer_invulnerable.restart();
+}
+
+//moveAndCollide碰撞前判断是否为无敌状态
+if (!this->is_invulnerable)
+{
+	//原本子弹碰撞逻辑
+}
+
+//moveAndCollide碰撞后设置无敌状态
+this->makeInvulnerable();
+
+```
+
+
+
+### 调试模式更多显示
+
+可以仿照前面的平台绘制，给子弹与玩家添加相似的调试线框，来在运行时检查数据碰撞是否正常。
+
+首先在player.h中引入is_debug变量，随后在debug开启时绘制时将玩家碰撞矩形绘制出来，虽然也可以仿照之前line函数提供使用摄像机位置进行绘图的重载，但是本项目中摄像头移动基本不明显可以简化使用默认rectangle函数进行绘制。
+
+同样在bullet.h中也引入is_debug变量，在子弹on_draw方法中也添加绘制调试信息的代码，随后来到子类Gamer1Bullet.h，Gamer2Bullet.h与Gamer2BulletEx.h中在on_draw显示调用父类绘制方法，运行程序按下调试按键Q，可以看到可视化的碰撞信息。
+
+```
+//player.h头部引入变量
+extern bool is_debug;
+
+//player.h成员函数on_draw增加代码
+if (is_debug)
+{
+	setlinecolor(RGB(0, 125, 255));
+	rectangle((int)this->m_position.m_x, (int)this->m_position.m_y, (int)(this->m_position.m_x + this->m_size.m_x), (int)(this->m_position.m_y + this->m_size.m_y));
+}
+
+//bullet.h头部引入变量
+extern bool is_debug;
+
+//bullet.h中on_draw添加代码
+if (is_debug)
+{
+	setfillcolor((RGB(255, 255, 255)));
+	setlinecolor((RGB(255, 255, 255)));
+
+	rectangle((int)this->m_position.m_x, (int)this->m_position.m_y, (int)this->m_position.m_x + this->m_size.m_x, (int)this->m_position.m_y + this->m_size.m_y);
+	solidcircle((int)this->m_position.m_x + this->m_size.m_x / 2, (int)this->m_position.m_y + this->m_size.m_y / 2, 5);
+}
+
+//Gamer1Bullet.h中结束添加
+Bullet::on_draw(camera);
+
+//Gamer2Bullet.h中结束添加
+Bullet::on_draw(camera);
+
+//Gamer2BulletEx.h中结束添加
+Bullet::on_draw(camera);
+
+```
+
+
+
+### 状态栏实现
+
+状态栏的实现创建新的statusBar.h文件，创建StatusBar类并定义m_position成员变量存储状态条渲染位置，以及暂存需要显示的玩家消息m_hp与m_mp，最后是一个图片类型m_img_avatar指针用于存储角色头像，这样就可以提供一个setAvatar方法用于设置用户头像图片以及位置信息setPosition的函数，最后还有生命值与能量的设置方法setHp与setMp，最后提供一个on_draw方法，由于界面绘制不需要依赖摄像机位置渲染，所以可以不添加任何参数，on_draw内部首先渲染了头像图片随后对两个状态跳到渲染，这正部分中定义一个width常量用于描述宽度，接下来只需要使用不同绘图颜色绘制圆角矩形两次便可以实现带阴影效果的状态条底板了，随后就是根据当前生命值和能量值来计算状态条需要填充多长内容了，随后使用不同颜色填充能量条了。
+
+```
+#ifndef _STATUSBAR_H_
+#define _STATUSBAR_H_
+
+#include "utils.h"
+#include "vector2.h"
+
+class StatusBar 
+{
+public:
+	StatusBar() = default;
+	~StatusBar() = default;
+
+	void setAvatar(IMAGE* img)
+	{
+		this->m_img_avatar = img;
+	}
+
+	void setPosition(int x, int y)
+	{
+		this->m_position.m_x = x, this->m_position.m_y = y;
+	}
+
+	void setHp(int val)
+	{
+		this->m_hp = val;
+	}
+
+	void setMp(int val)
+	{
+		this->m_mp = val;
+	}
+	
+	void on_draw()
+	{
+		putImageAlpha(this->m_position.m_x, this->m_position.m_y, this->m_img_avatar);
+
+		setfillcolor(RGB(5, 5, 5));
+		solidroundrect(this->m_position.m_x + 100, this->m_position.m_y + 10, this->m_position.m_x + 100 + this->width + 3 * 2, this->m_position.m_y + 36, 8, 8);
+		solidroundrect(this->m_position.m_x + 100, this->m_position.m_y + 45, this->m_position.m_x + 100 + this->width + 3 * 2, this->m_position.m_y + 71, 8, 8);
+
+		setfillcolor(RGB(67, 47, 47));
+		solidroundrect(this->m_position.m_x + 100, this->m_position.m_y + 10, this->m_position.m_x + 100 + this->width + 3, this->m_position.m_y + 33, 8, 8);
+		solidroundrect(this->m_position.m_x + 100, this->m_position.m_y + 45, this->m_position.m_x + 100 + this->width + 3, this->m_position.m_y + 68, 8, 8);
+
+		float hp_bar_width = this->width * max(0, this->m_hp) / 100.0f;
+		float mp_bar_width = this->width * min(100, this->m_mp) / 100.0f;
+
+		setfillcolor(RGB(197, 61, 67));
+		msolidroundrect(this->m_position.m_x + 100, this->m_position.m_y + 10, this->m_position.m_x + 100 + (int)hp_bar_width + 3, this->m_position.m_y + 33, 8, 8);
+		setfillcolor(RGB(83, 131, 195));
+		solidroundrect(this->m_position.m_x + 100, this->m_position.m_y + 45, this->m_position.m_x + 100 + (int)mp_bar_width + 3, this->m_position.m_y + 68, 8, 8);
+	}
+
+private:
+	const int width = 275;
+
+private:
+	int m_hp = 0;
+	int m_mp = 0;
+
+	Vector2 m_position = { 0, 0 };
+
+	IMAGE* m_img_avatar = nullptr;
+
+};
+
+#endif
+```
+
+
+
+随后只需要在gameScene.h头文件引入statusBar.h，并在类内添加两个状态条对象，随后在on_draw方法的末尾添加两个状态栏的渲染，由于需要获取玩家状态数值，需要给玩家添加mp与hp的get方法，随后在gameScene.h中的on_update依次调用set方法进行设置。
+
+但是此处还是有一个问题，选角部分两个玩家具体使用哪张图片作为头像还未记录在程序中，所有首先在main.cpp中定义两个全局图片指针img_player_1_avatar与img_player_2_avatar，这样就可以在selectorScene.h中添加外部声明并在场景退出阶段实例化玩家后设置对应的头像，在gameScene.h中即可现在全局声明引用外部资源，随后在on_enter中设置状态框头像图片，运行后即可看到mp与hp实时显示反馈可视化图片了。
+
+```
+//gameScene.h顶部引入头文件gameScene.h
+#include "statusBar.h"
+
+//gameScene.h成员变量添加玩家状态条
+StatusBar m_status_bar_1P;
+StatusBar m_status_bar_2P;
+
+//gameScene.h中on_draw方法最后进行渲染
+this->m_status_bar_1P.on_draw();
+this->m_status_bar_2P.on_draw();
+
+//player.h中添加获取方法
+const int getHp() const { return this->m_hp; }
+const int getMp() const { return this->m_mp; }
+
+//gameScene.h中on_update方法最后进行渲染
+this->m_status_bar_1P.setHp(player_1->getHp());
+this->m_status_bar_1P.setMp(player_1->getMp());
+this->m_status_bar_2P.setHp(player_2->getHp());
+this->m_status_bar_2P.setMp(player_2->getMp());
+
+//main.cpp全局区添加变量
+IMAGE* img_player_1_avatar = nullptr;
+IMAGE* img_player_2_avatar = nullptr;
+
+//selectorScene.h全局引入声明
+extern IMAGE* img_player_1_avatar;
+extern IMAGE* img_player_2_avatar;
+
+//selectorScene.h成员函数中on_exit添加代码
+virtual void on_exit()
+{
+	switch (this->m_player_type_1)
+	{
+	case PlayerType::Gamer1:
+		player_1 = new PlayerGamer1();
+		img_player_1_avatar = &img_avatar_gamer1;
+		break;
+	case PlayerType::Gamer2:
+		player_1 = new PlayerGamer2();
+		img_player_1_avatar = &img_avatar_gamer2;
+		break;
+	}
+	player_1->setId(PlayerId::P1);
+
+	switch (this->m_player_type_2)
+	{
+	case PlayerType::Gamer1:
+		player_2 = new PlayerGamer1();
+		img_player_2_avatar = &img_avatar_gamer1;
+		break;
+	case PlayerType::Gamer2:
+		player_2 = new PlayerGamer2();
+		img_player_2_avatar = &img_avatar_gamer2;
+		break;
+	}
+	player_2->setId(PlayerId::P2);
+}
+
+//gameScene.h外部引用变量
+extern IMAGE* img_player_1_avatar;
+extern IMAGE* img_player_2_avatar;
+
+//gameScene.h中on_enter方法添加代码
+this->m_status_bar_1P.setAvatar(img_player_1_avatar);
+this->m_status_bar_2P.setAvatar(img_player_2_avatar);
+
+this->m_status_bar_1P.setPosition(235, 625);
+this->m_status_bar_2P.setPosition(675, 625);
+
+```
+
+
+
+## 第十四节完整代码
+
+**GameScene.h**
+
+```
+#ifndef _GAME_SCENE_H_
+#define _GAME_SCENE_H_
+
+#include "utils.h"
+#include "platform.h"
+#include "scene.h"
+#include "sceneManager.h"
+#include "player.h"
+#include "statusBar.h"
+
+extern Player* player_1;
+extern Player* player_2;
+
+extern IMAGE img_sky;
+extern IMAGE img_hills;
+extern IMAGE img_platform_large;
+extern IMAGE img_platform_small;
+
+extern IMAGE* img_player_1_avatar;
+extern IMAGE* img_player_2_avatar;
+
+extern Camera main_camera;
+
+extern std::vector<Platform> platform_list;
+extern std::vector<Bullet*> bullet_list;
+
+extern SceneManager scene_manager;
+
+class GameScene : public Scene
+{
+public:
+	GameScene() = default;
+	~GameScene() = default;
+
+	virtual void on_enter()
+	{
+		this->m_status_bar_1P.setAvatar(img_player_1_avatar);
+		this->m_status_bar_2P.setAvatar(img_player_2_avatar);
+
+		this->m_status_bar_1P.setPosition(235, 625);
+		this->m_status_bar_2P.setPosition(675, 625);
+
+		player_1->setPosition(200, 50);
+		player_2->setPosition(975, 50);
+
+		this->pos_img_sky.x = (getwidth() - img_sky.getwidth()) / 2;
+		this->pos_img_sky.y = (getheight() - img_sky.getheight()) / 2;
+
+		this->pos_img_hills.x = (getwidth() - img_hills.getwidth()) / 2;
+		this->pos_img_hills.y = (getheight() - img_hills.getheight()) / 2;
+
+		platform_list.resize(4);
+		Platform& large_platform = platform_list[0];
+		large_platform.m_img = &img_platform_large;
+		large_platform.m_render_position.x = 122;
+		large_platform.m_render_position.y = 455;
+		large_platform.m_shape.left = (float)large_platform.m_render_position.x + 30;
+		large_platform.m_shape.right = (float)large_platform.m_render_position.x + img_platform_large.getwidth() - 30;
+		large_platform.m_shape.y = (float)large_platform.m_render_position.y + 60;
+
+		Platform& small_platform_1 = platform_list[1];
+		small_platform_1.m_img = &img_platform_small;
+		small_platform_1.m_render_position.x = 175;
+		small_platform_1.m_render_position.y = 360;
+		small_platform_1.m_shape.left = (float)small_platform_1.m_render_position.x + 40;
+		small_platform_1.m_shape.right = (float)small_platform_1.m_render_position.x + img_platform_small.getwidth() - 40;
+		small_platform_1.m_shape.y = (float)small_platform_1.m_render_position.y + img_platform_small.getheight() / 2;
+
+		Platform& small_platform_2 = platform_list[2];
+		small_platform_2.m_img = &img_platform_small;
+		small_platform_2.m_render_position.x = 855;
+		small_platform_2.m_render_position.y = 360;
+		small_platform_2.m_shape.left = (float)small_platform_2.m_render_position.x + 40;
+		small_platform_2.m_shape.right = (float)small_platform_2.m_render_position.x + img_platform_small.getwidth() - 40;
+		small_platform_2.m_shape.y = (float)small_platform_2.m_render_position.y + img_platform_small.getheight() / 2;
+
+		Platform& small_platform_3 = platform_list[3];
+		small_platform_3.m_img = &img_platform_small;
+		small_platform_3.m_render_position.x = 515;
+		small_platform_3.m_render_position.y = 255;
+		small_platform_3.m_shape.left = (float)small_platform_3.m_render_position.x + 40;
+		small_platform_3.m_shape.right = (float)small_platform_3.m_render_position.x + img_platform_small.getwidth() - 40;
+		small_platform_3.m_shape.y = (float)small_platform_3.m_render_position.y + img_platform_small.getheight() / 2;
+
+	}
+
+	virtual void on_update(int delta)
+	{
+		player_1->on_update(delta);
+		player_2->on_update(delta);
+
+		main_camera.on_updata(delta);
+
+		bullet_list.erase(std::remove_if(bullet_list.begin(), bullet_list.end(), 
+			[](const Bullet* b)
+			{
+				bool deletable = b->checkCanRemove();
+				if (deletable) delete b;
+				return deletable;
+			}), 
+			bullet_list.end());
+
+		for (Bullet* b : bullet_list) b->on_update(delta);
+
+		this->m_status_bar_1P.setHp(player_1->getHp());
+		this->m_status_bar_1P.setMp(player_1->getMp());
+		this->m_status_bar_2P.setHp(player_2->getHp());
+		this->m_status_bar_2P.setMp(player_2->getMp());
+	}
+
+	virtual void on_draw(const Camera& camera) 
+	{
+		putImageAlpha(camera, this->pos_img_sky.x, this->pos_img_sky.y, &img_sky);
+		putImageAlpha(camera, this->pos_img_hills.x, this->pos_img_hills.y, &img_hills);
+
+		for (const Platform& p : platform_list) p.on_draw(camera);
+
+		player_1->on_draw(camera);
+		player_2->on_draw(camera);
+
+		for (const Bullet* b : bullet_list) b->on_draw(camera);
+
+		this->m_status_bar_1P.on_draw();
+		this->m_status_bar_2P.on_draw();
+	}
+
+	virtual void on_input(const ExMessage& msg)
+	{
+		player_1->on_input(msg);
+		player_2->on_input(msg);
+
+		switch (msg.message)
+		{
+		case WM_KEYDOWN:
+			break;
+		case WM_KEYUP:
+			switch (msg.vkcode)
+			{
+			case 0x51://'Q'
+				is_debug = !is_debug;
+				break;
+			default:
+				break;
+			}
+			break;
+		default:
+			break;
+		}
+	}
+
+	virtual void on_exit() {}
+
+private:
+	POINT pos_img_sky = { 0 };
+	POINT pos_img_hills = { 0 };
+
+	StatusBar m_status_bar_1P;
+	StatusBar m_status_bar_2P;
+
+};
+
+#endif
+```
+
+**player.h**
+
+```
+#ifndef _PLAYER_H_
+#define _PLAYER_H_
+
+#include "camera.h"
+#include "vector2.h"
+#include "animation.h"
+#include "playerId.h"
+#include "platform.h"
+#include "bullet.h"
+
+#include <graphics.h>
+
+extern std::vector<Platform> platform_list;
+extern std::vector<Bullet*> bullet_list;
+
+extern bool is_debug;
+
+class Player
+{
+public:
+	Player()
+	{
+		this->m_current_animaiton = &this->m_animation_idle_right;
+
+		this->m_timer_invulnerable.setWaitTime(750);
+		this->m_timer_invulnerable.setOneShot(true);
+		this->m_timer_invulnerable.setCallback([&]() { this->is_invulnerable = false; });
+
+		this->m_timer_invulnerable_blink.setWaitTime(75);
+		this->m_timer_invulnerable_blink.setCallback([&]() {this->is_show_sketch_frame = !this->is_show_sketch_frame; });
+
+		this->m_timer_attack_cd.setWaitTime(this->m_attack_cd);
+		this->m_timer_attack_cd.setOneShot(true);
+		this->m_timer_attack_cd.setCallback([&]() {this->can_attack = true; });
+	}
+
+	~Player() = default;
+
+	virtual void on_update(int delta)
+	{
+		if (this->is_attack_keydown)
+		{
+			if (this->can_attack)
+			{
+				this->on_attack();
+				this->can_attack = false;
+				this->m_timer_attack_cd.restart();
+			}
+		}
+
+		int direction = this->is_right_keydown - this->is_left_keydown;
+
+		if (direction != 0)
+		{
+			if (!this->is_attacking_ex) this->is_facing_right = direction > 0;
+
+			this->m_current_animaiton = is_facing_right ? &this->m_animation_run_right : &this->m_animation_run_left;
+			
+			float distance = direction * this->run_velocity * delta;
+			this->on_run(distance);
+		}
+		else
+		{
+			this->m_current_animaiton = is_facing_right ? &this->m_animation_idle_right : &this->m_animation_idle_left;
+		}
+
+		if (this->is_attacking_ex) this->m_current_animaiton = this->is_facing_right ? &this->m_animation_attack_ex_right : &this->m_animation_attack_ex_left;
+
+		this->m_current_animaiton->on_update(delta);
+
+		this->m_timer_attack_cd.on_updata(delta);
+		this->m_timer_invulnerable.on_updata(delta);
+		this->m_timer_invulnerable_blink.on_updata(delta);
+		
+		if (this->is_show_sketch_frame) sketchImage(this->m_current_animaiton->getFrame(), &this->m_img_sketch);
+
+		this->moveAndCollide(delta);
+	}
+
+	virtual void on_draw(const Camera& camera)
+	{
+		if (this->m_hp > 0 && this->is_invulnerable && this->is_show_sketch_frame) putImageAlpha(camera, (int)this->m_position.m_x, (int)this->m_position.m_y, &this->m_img_sketch);
+		else this->m_current_animaiton->on_draw(camera, this->m_position.m_x, this->m_position.m_y);
+
+		if (is_debug)
+		{
+			setlinecolor(RGB(0, 125, 255));
+			rectangle((int)this->m_position.m_x, (int)this->m_position.m_y, (int)(this->m_position.m_x + this->m_size.m_x), (int)(this->m_position.m_y + this->m_size.m_y));
+		}
+	}
+
+	virtual void on_input(const ExMessage& msg)
+	{
+		switch (msg.message)
+		{
+		case WM_KEYDOWN:
+			switch (this->m_id)
+			{
+			case PlayerId::P1:
+				switch (msg.vkcode)
+				{
+				case 0x41://'A'
+					this->is_left_keydown = true;
+					break;
+				case 0x44://'D'
+					this->is_right_keydown = true;
+					break;
+				case 0x57://'W'
+					this->on_jump();
+					break;
+				case 0x46://'F'
+					this->is_attack_keydown = true;
+					break;
+				}
+				break;
+			case PlayerId::P2:
+				switch (msg.vkcode)
+				{
+				case VK_LEFT://'←'
+					this->is_left_keydown = true;
+					break;
+				case VK_RIGHT://'→'
+					this->is_right_keydown = true;
+					break;
+				case VK_UP://'↑'
+					this->on_jump();
+					break;
+				case VK_OEM_PERIOD://'.'
+					this->is_attack_keydown = true;
+					break;
+				case VK_OEM_COMMA://','
+					if (this->m_mp >= 100) this->m_mp = 0, this->on_attack_ex();
+					break;
+				}
+				break;
+			}
+			break;
+		case WM_KEYUP:
+			switch (this->m_id)
+			{
+			case PlayerId::P1:
+				switch (msg.vkcode)
+				{
+				case 0x41://'A'
+					this->is_left_keydown = false;
+					break;
+				case 0x44://'D'
+					this->is_right_keydown = false;
+					break;
+				case 0x46://'F'
+					this->is_attack_keydown = false;
+					break;
+				case 0x47:///'G'
+					if (this->m_mp >= 100) this->m_mp = 0, this->on_attack_ex();
+					break;
+				}
+				break;
+			case PlayerId::P2:
+				switch (msg.vkcode)
+				{
+				case VK_LEFT://'←'
+					this->is_left_keydown = false;
+					break;
+				case VK_RIGHT://'→'
+					this->is_right_keydown = false;
+					break;
+				case VK_OEM_PERIOD://'.'
+					this->is_attack_keydown = false;
+					break;
+				}
+				break;
+			}
+			break;
+		}
+
+	}
+
+	void on_jump()
+	{
+		if (this->m_velocity.m_y != 0 || this->is_attacking_ex) return;
+
+		this->m_velocity.m_y += this->jump_velocity;
+	}
+
+	void on_run(float destance) 
+	{
+		if (this->is_attacking_ex) return;
+
+		this->m_position.m_x += destance;
+	}
+
+	void moveAndCollide(int delta)
+	{
+		this->m_velocity.m_y += this->gravity * delta;
+		this->m_position += this->m_velocity * (float)delta;
+
+		if (this->m_velocity.m_y > 0)
+		{
+			for (const Platform& pt : platform_list)
+			{
+				const Platform::CollisionShape& shape = pt.m_shape;
+
+				bool is_collide_x = (max(this->m_position.m_x + this->m_size.m_x, shape.right) - min(this->m_position.m_x, shape.left) <= this->m_size.m_x + (shape.right - shape.left));
+				bool is_collide_y = (shape.y >= this->m_position.m_y && shape.y <= this->m_position.m_y + this->m_size.m_y);
+
+				if (is_collide_x && is_collide_y)
+				{
+					float delta_pos_y = this->m_velocity.m_y * delta;
+					float last_tick_foot_pos_y = this->m_position.m_y + this->m_size.m_y - delta_pos_y;
+					if (last_tick_foot_pos_y <= shape.y)
+					{
+						this->m_position.m_y = shape.y - this->m_size.m_y;
+						this->m_velocity.m_y = 0;
+
+						break;
+					}
+				}
+			}
+		}
+
+		if (!this->is_invulnerable)
+		{
+			for (Bullet* b : bullet_list)
+			{
+				if (!b->getValid() || b->getCollideTarget() != this->m_id) continue;
+
+				if (b->checkCollide(this->m_position, this->m_size))
+				{
+					this->makeInvulnerable();
+
+					b->on_collide();
+					b->setValid(false);
+
+					this->m_hp -= b->getDamage();
+				}
+			}
+		}
+	}
+
+	void makeInvulnerable()
+	{
+		this->is_invulnerable = true;
+		this->m_timer_invulnerable.restart();
+	}
+
+	void setId(PlayerId id) { this->m_id = id; }
+
+	void setPosition(int x, int y) { this->m_position.m_x = x, this->m_position.m_y = y; }
+
+	const Vector2& getPosition() const { return this->m_position; }
+
+	const Vector2& getSize() const { return this->m_size; }
+
+	const int getHp() const { return this->m_hp; }
+
+	const int getMp() const { return this->m_mp; }
+
+	virtual void on_attack() {}
+
+	virtual void on_attack_ex() {}
+
+protected:
+	int m_hp = 100;
+	int m_mp = 0;
+
+	Vector2 m_size;
+	Vector2 m_position;
+	Vector2 m_velocity;
+
+	Animation m_animation_idle_left;
+	Animation m_animation_idle_right;
+	Animation m_animation_run_left;
+	Animation m_animation_run_right;
+	Animation m_animation_attack_ex_left;
+	Animation m_animation_attack_ex_right;
+
+	Animation* m_current_animaiton = nullptr;
+
+	PlayerId m_id;
+
+	IMAGE m_img_sketch;
+
+	const float run_velocity = 0.55f;//水平移动速度
+	const float gravity = 0.0016f;//重力加速度
+	const float jump_velocity = -0.85f;//跳跃速度
+
+	bool is_invulnerable = false;
+	bool is_show_sketch_frame = false;
+
+	bool is_left_keydown = false;
+	bool is_right_keydown = false;
+
+	bool is_facing_right = true;
+
+	bool is_attack_keydown = false;
+	bool is_attacking_ex = false;
+
+	bool can_attack = true;
+	int m_attack_cd = 500;
+
+	Timer m_timer_attack_cd;
+	Timer m_timer_invulnerable;
+	Timer m_timer_invulnerable_blink;
+
+};
+
+#endif
+```
+
+**utils.h**
+
+```
+#ifndef _UTILS_H_
+#define _UTILS_H_
+
+#pragma comment(lib, "MSIMG32.LIB")
+
+#include <graphics.h>
+
+inline void putImageAlpha(int dst_x, int dst_y, IMAGE* img)
+{
+	int w = img->getwidth(), h = img->getheight();
+
+	AlphaBlend(GetImageHDC(GetWorkingImage()), dst_x, dst_y, w, h, GetImageHDC(img), 0, 0, w, h, { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA });
+}
+
+inline void putImageAlpha(const Camera& camera, int dst_x, int dst_y, IMAGE* img)
+{
+	int w = img->getwidth(), h = img->getheight();
+
+	AlphaBlend(GetImageHDC(GetWorkingImage()), (int)(dst_x - camera.getPosition().m_x), (int)(dst_y - camera.getPosition().m_y), w, h, GetImageHDC(img), 0, 0, w, h, { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA });
+}
+
+inline void putImageAlpha(int dst_x, int dst_y, int width, int height, IMAGE* img, int src_x, int src_y)
+{
+	int w = width > 0 ? width : img->getwidth(), h = height > 0 ? height : img->getheight();
+
+	AlphaBlend(GetImageHDC(GetWorkingImage()), dst_x, dst_y, w, h, GetImageHDC(img), src_x, src_y, w, h, { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA });
+}
+
+inline void line(const Camera& camera, int x1, int y1, int x2, int y2)
+{
+	const Vector2& pos_camera = camera.getPosition();
+	line((int)(x1 - pos_camera.m_x), (int)(y1 - pos_camera.m_y), (int)(x2 - pos_camera.m_x), (int)(y2 - pos_camera.m_y));
+}
+
+inline void flipImage(IMAGE* src, IMAGE* dst)
+{
+	int w = src->getwidth(), h = src->getheight();
+	Resize(dst, w, h);
+	
+	DWORD* src_buffer = GetImageBuffer(src);
+	DWORD* dst_buffer = GetImageBuffer(dst);
+	for (int i = 0; i < h; i++)
+	{
+		for (int j = 0; j < w; j++)
+		{
+			int src_idx = i * w + j, dst_idx = (i + 1) * w - j - 1;
+			dst_buffer[dst_idx] = src_buffer[src_idx];
+		}
+	}
+	return;
+}
+
+inline void sketchImage(IMAGE* src, IMAGE* dst)
+{
+	int w = src->getwidth();
+	int h = src->getheight();
+
+	Resize(dst, w, h);
+	DWORD* src_buffer = GetImageBuffer(src);
+	DWORD* dst_buffer = GetImageBuffer(dst);
+	for (int y = 0; y < h; y++)
+	{
+		for (int x = 0; x < w; x++) 
+		{
+			int idx = y * w + x;
+			dst_buffer[idx] = BGR(RGB(255, 255, 255) | (src_buffer[idx] & 0xFF000000));
+		}
+	}
+}
+
+#endif
+```
+
+**bullet.h**
+
+```
+#ifndef _BULLET_H_
+#define _BULLET_H_
+
+#include "vector2.h"
+#include "playerId.h"
+#include "camera.h"
+
+#include <functional>
+#include <graphics.h>
+
+extern bool is_debug;
+
+class Bullet
+{
+public:
+	Bullet() = default;
+	~Bullet() = default;
+
+	virtual void on_collide()
+	{
+		if (this->m_callback) this->m_callback();
+	}
+
+	virtual bool checkCollide(const Vector2& position, const Vector2& size)
+	{
+		return this->m_position.m_x + this->m_size.m_x / 2 >= position.m_x &&
+			this->m_position.m_x + this->m_size.m_x / 2 <= position.m_x + size.m_x && 
+			this->m_position.m_y + this->m_size.m_y / 2 >= position.m_y && 
+			this->m_position.m_y + this->m_size.m_y / 2 <= position.m_y + size.m_y;
+	}
+
+	virtual void on_update(int delta)
+	{
+	}
+
+	virtual void on_draw(const Camera& camera) const
+	{
+		if (is_debug)
+		{
+			setfillcolor((RGB(255, 255, 255)));
+			setlinecolor((RGB(255, 255, 255)));
+
+			rectangle((int)this->m_position.m_x, (int)this->m_position.m_y, (int)this->m_position.m_x + this->m_size.m_x, (int)this->m_position.m_y + this->m_size.m_y);
+			solidcircle((int)this->m_position.m_x + this->m_size.m_x / 2, (int)this->m_position.m_y + this->m_size.m_y / 2, 5);
+		}
+	}
+
+	int getDamage() { return this->m_damage; }
+
+	const Vector2& getPosition() { return this->m_position; }
+
+	const Vector2& getSize() { return this->m_size; }
+
+	PlayerId getCollideTarget() const { return this->m_target_id; }
+
+	bool getValid() { return this->is_valid; }
+
+	bool checkCanRemove() const { return this->can_remove; }
+
+	void setCallback(std::function<void()> callback) { this->m_callback = callback; }
+
+	void setDamage(int damage) { this->m_damage = damage; }
+
+	void setPosition(float x, float y) { this->m_position.m_x = x, this->m_position.m_y = y; }
+
+	void setVelocity(float x, float y) { this->m_velocity.m_x = x, this->m_velocity.m_y = y; }
+
+	void setCollideTarget(PlayerId target) { this->m_target_id = target; }
+
+	void setValid(bool is_valid) { this->is_valid = is_valid; }
+
+protected:
+	bool checkIfExceedScreen()
+	{
+		return (this->m_position.m_x + this->m_size.m_x <= 0 || this->m_position.m_x > getwidth() || 
+			this->m_position.m_y + this->m_size.m_y <= 0 || this->m_position.m_y > getheight());
+	}
+
+protected:
+	Vector2 m_size;
+	Vector2 m_position;
+	Vector2 m_velocity;
+
+	int m_damage = 10;
+	
+	bool is_valid = true;
+	bool can_remove = false;
+
+	std::function<void()> m_callback;
+
+	PlayerId m_target_id = PlayerId::P1;
+
+};
+
+#endif
+```
+
+**Gamer1Bullet.h**
+
+```
+#ifndef _GAMER1_BULLET_H_
+#define _GAMER1_BULLET_H_
+
+#include "bullet.h"
+#include "animation.h"
+
+extern IMAGE img_gamer1_bullet;
+extern Atlas atlas_gamer1_bullet_break;
+
+class Gamer1Bullet : public Bullet
+{
+public:
+	Gamer1Bullet() 
+	{
+		this->m_size.m_y = this->m_size.m_x = 64;
+		this->m_damage = 10;
+
+		this->m_animation_bullet_break.setAtlas(&atlas_gamer1_bullet_break);
+		this->m_animation_bullet_break.setInterval(100);
+		this->m_animation_bullet_break.setLoop(false);
+		this->m_animation_bullet_break.setCallBack([&]() {this->can_remove = true; });
+	}
+
+	~Gamer1Bullet() = default;
+
+	void on_collide()
+	{
+		Bullet::on_collide();
+
+		switch (rand() % 3)
+		{
+		case 0:
+			mciSendString(L"play gamer1_bullet_break_1 from 0", NULL, 0, NULL);
+			break;
+		case 1:
+			mciSendString(L"play gamer1_bullet_break_2 from 0", NULL, 0, NULL);
+			break;
+		case 2:
+			mciSendString(L"play gamer1_bullet_break_3 from 0", NULL, 0, NULL);
+			break;
+		default:
+			break;
+		}
+	}
+
+	void on_draw(const Camera& camera) const
+	{
+		if (this->is_valid)
+		{
+			putImageAlpha(camera, (int)this->m_position.m_x, (int)this->m_position.m_y, &img_gamer1_bullet);
+		}
+		else
+		{
+			this->m_animation_bullet_break.on_draw(camera, (int)this->m_position.m_x, (int)this->m_position.m_y);
+		}
+
+		Bullet::on_draw(camera);
+	}
+
+	void on_update(int delta)
+	{
+		this->m_position += this->m_velocity * (float)delta;
+
+		if (!this->is_valid)
+		{
+			this->m_animation_bullet_break.on_update(delta);
+		}
+
+		if (this->checkIfExceedScreen())
+		{
+			this->can_remove = true;
+		}
+	}
+
+private:
+	Animation m_animation_bullet_break;
+
+};
+
+#endif
+```
+
+**Gamer2Bullet.h**
+
+```
+#ifndef _GAMER2_BULLET_H_
+#define _GAMER2_BULLET_H_
+
+#include "bullet.h"
+#include "animation.h"
+
+extern Camera main_camera;
+
+extern Atlas atlas_gemer2_bullet;
+extern Atlas atlas_gemer2_bullet_explode;
+
+class Gamer2Bullet : public Bullet
+{
+public:
+	Gamer2Bullet() 
+	{
+		this->m_size.m_x = this->m_size.m_y = 96;
+		this->m_damage = 20;
+		
+		this->m_animation_idle.setAtlas(&atlas_gemer2_bullet);
+		this->m_animation_idle.setInterval(50);
+
+		this->m_animation_explode.setAtlas(&atlas_gemer2_bullet_explode);
+		this->m_animation_explode.setInterval(50);
+		this->m_animation_explode.setLoop(false);
+		this->m_animation_explode.setCallBack([&]() {this->can_remove = true; });
+
+		IMAGE* frame_idle = this->m_animation_idle.getFrame();
+		IMAGE* frame_explode = this->m_animation_explode.getFrame();
+
+		this->m_explode_render_offset.m_x = (frame_idle->getwidth() - frame_explode->getwidth()) / 2.0f;
+		this->m_explode_render_offset.m_y = (frame_idle->getheight() - frame_explode->getheight()) / 2.0f;
+
+	}
+
+	~Gamer2Bullet() = default;
+
+	void on_collide()
+	{
+		Bullet::on_collide();
+
+		main_camera.shake(5, 250);
+
+		mciSendString(L"play gamer2_bullet_explode from 0", NULL, 0, NULL);
+	}
+
+	void on_draw(const Camera& camera) const
+	{
+		if (this->is_valid) 
+		{
+			this->m_animation_idle.on_draw(camera, this->m_position.m_x, this->m_position.m_y);
+		}
+		else
+		{
+			this->m_animation_explode.on_draw(camera, this->m_position.m_x + this->m_explode_render_offset.m_x, this->m_position.m_y + this->m_explode_render_offset.m_y);
+		}
+		Bullet::on_draw(camera);
+	}
+
+	void on_update(int delta)
+	{
+		if (this->is_valid)
+		{
+			this->m_velocity.m_y += this->m_gravity * delta;
+			this->m_position += this->m_velocity * (float)delta;
+		}
+
+		if (!this->is_valid)
+		{
+			this->m_animation_explode.on_update(delta);
+		}
+		else
+		{
+			this->m_animation_idle.on_update(delta);
+		}
+
+		if (this->checkIfExceedScreen())
+		{
+			this->can_remove = true;
+		}
+	}
+
+private:
+	const float m_gravity = 0.001f;
+
+	Animation m_animation_idle;
+	Animation m_animation_explode;
+	Vector2 m_explode_render_offset;
+
+};
+
+#endif
+```
+
+**Gamer2BulletEx.h**
+
+```
+#ifndef _GAMER2_BULLET_EX_H_
+#define _GAMER2_BULLET_EX_H_
+
+#include "bullet.h"
+#include "animation.h"
+
+extern Camera main_camera;
+
+extern Atlas atlas_gamer2_bullet_ex;
+extern Atlas atlas_gamer2_bullet_ex_explode;
+
+class Gamer2BulletEx : public Bullet
+{
+public:
+	Gamer2BulletEx()
+	{
+		this->m_size.m_x = this->m_size.m_y = 288;
+		this->m_damage = 20;
+
+		this->m_animation_idle.setAtlas(&atlas_gamer2_bullet_ex);
+		this->m_animation_idle.setInterval(50);
+
+		this->m_animation_explode.setAtlas(&atlas_gamer2_bullet_ex_explode);
+		this->m_animation_explode.setInterval(50);
+		this->m_animation_explode.setLoop(false);
+		this->m_animation_explode.setCallBack([&]() {this->can_remove = true; });
+
+		IMAGE* frame_idle = this->m_animation_idle.getFrame();
+		IMAGE* frame_explode = this->m_animation_explode.getFrame();
+
+		this->m_explode_render_offset.m_x = (frame_idle->getwidth() - frame_explode->getwidth()) / 2.0f;
+		this->m_explode_render_offset.m_y = (frame_idle->getheight() - frame_explode->getheight()) / 2.0f;
+
+	}
+
+	~Gamer2BulletEx() = default;
+
+	bool checkCollide(const Vector2& position, const Vector2& size)
+	{
+		bool is_collide_x = (max(this->m_position.m_x + this->m_size.m_x, position.m_x + size.m_x) - min(this->m_position.m_x, position.m_x) <= this->m_size.m_x + size.m_x);
+		bool is_collide_y = (max(this->m_position.m_y + this->m_size.m_y, position.m_y + size.m_y) - min(this->m_position.m_y, position.m_y) <= this->m_size.m_y + size.m_y);
+
+		return is_collide_x && is_collide_y;
+	}
+
+	void on_collide()
+	{
+		Bullet::on_collide();
+
+		main_camera.shake(20, 250);
+
+		mciSendString(L"play gamer2_bullet_explode_ex from 0", NULL, 0, NULL);
+	}
+
+	void on_draw(const Camera& camera) const
+	{ 
+		if (this->is_valid)
+		{
+			this->m_animation_idle.on_draw(camera, this->m_position.m_x, this->m_position.m_y);
+		}
+		else
+		{
+			this->m_animation_explode.on_draw(camera, this->m_position.m_x + this->m_explode_render_offset.m_x, this->m_position.m_y + this->m_explode_render_offset.m_y);
+		}
+		Bullet::on_draw(camera);
+	}
+
+	void on_update(int delta)
+	{
+		if (this->is_valid)
+		{
+			this->m_position += this->m_velocity * (float)delta;
+		}
+
+		if (!this->is_valid)
+		{
+			this->m_animation_explode.on_update(delta);
+		}
+		else
+		{
+			this->m_animation_idle.on_update(delta);
+		}
+
+		if (this->checkIfExceedScreen())
+		{
+			this->can_remove = true;
+		}
+	}
+
+private:
+	Animation m_animation_idle;
+	Animation m_animation_explode;
+	Vector2 m_explode_render_offset;
+
+};
+
+#endif
+```
+
+**statusBar.h**
+
+```
+#ifndef _STATUSBAR_H_
+#define _STATUSBAR_H_
+
+#include "utils.h"
+#include "vector2.h"
+
+class StatusBar 
+{
+public:
+	StatusBar() = default;
+	~StatusBar() = default;
+
+	void setAvatar(IMAGE* img)
+	{
+		this->m_img_avatar = img;
+	}
+
+	void setPosition(int x, int y)
+	{
+		this->m_position.m_x = x, this->m_position.m_y = y;
+	}
+
+	void setHp(int val)
+	{
+		this->m_hp = val;
+	}
+
+	void setMp(int val)
+	{
+		this->m_mp = val;
+	}
+	
+	void on_draw()
+	{
+		putImageAlpha(this->m_position.m_x, this->m_position.m_y, this->m_img_avatar);
+
+		setfillcolor(RGB(5, 5, 5));
+		solidroundrect(this->m_position.m_x + 100, this->m_position.m_y + 10, this->m_position.m_x + 100 + this->width + 3 * 2, this->m_position.m_y + 36, 8, 8);
+		solidroundrect(this->m_position.m_x + 100, this->m_position.m_y + 45, this->m_position.m_x + 100 + this->width + 3 * 2, this->m_position.m_y + 71, 8, 8);
+
+		setfillcolor(RGB(67, 47, 47));
+		solidroundrect(this->m_position.m_x + 100, this->m_position.m_y + 10, this->m_position.m_x + 100 + this->width + 3, this->m_position.m_y + 33, 8, 8);
+		solidroundrect(this->m_position.m_x + 100, this->m_position.m_y + 45, this->m_position.m_x + 100 + this->width + 3, this->m_position.m_y + 68, 8, 8);
+
+		float hp_bar_width = this->width * max(0, this->m_hp) / 100.0f;
+		float mp_bar_width = this->width * min(100, this->m_mp) / 100.0f;
+
+		setfillcolor(RGB(197, 61, 67));
+		solidroundrect(this->m_position.m_x + 100, this->m_position.m_y + 10, this->m_position.m_x + 100 + (int)hp_bar_width + 3, this->m_position.m_y + 33, 8, 8);
+		setfillcolor(RGB(83, 131, 195));
+		solidroundrect(this->m_position.m_x + 100, this->m_position.m_y + 45, this->m_position.m_x + 100 + (int)mp_bar_width + 3, this->m_position.m_y + 68, 8, 8);
+	}
+
+private:
+	const int width = 275;
+
+private:
+	int m_hp = 0;
+	int m_mp = 0;
+
+	Vector2 m_position = { 0, 0 };
+
+	IMAGE* m_img_avatar = nullptr;
+
+};
+
+#endif
+```
+
+
+
+## 第十五节
+
+分析与解剖粒子系统时，可以从两个角度入手，即粒子对象本身与粒子发射器。
+
+粒子对象通常由动画物理和生命周期等众多属性来描述，而粒子发射器则决定着粒子对象的生成方式，例如发射频率、发射方向和初始速度等等，也就是说一个完整的粒子系统实现是极为庞大的，目前阶段项目仍然是秉持着深入浅出的核心思想，在目前已有知识技术之上封装一个可用的例子系统。
+
+定义particle.h头文件
+
+
+
+## 第十五节完整代码
+
+
+
+## 第十六节
+
+
+
+## 第十六节完整代码
