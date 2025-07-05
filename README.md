@@ -11245,8 +11245,1567 @@ if (player_1->getHp() <= 0 || player_2->getHp() <= 0)
 
 ### 界面结算动画特效
 
-首先
+首先gameScene.h中需要引用对应图片资源，添加变量描述位置，结算分别包含底部背景与顶部文本部分，当游戏结束时，背景应当更快进入画面随后文本划入，二者停留一段时间后再依次从屏幕另一侧退出，所以还需要两个定时器控制动画过程，最后还需要一个bool标记结算标题动态效果是否开始执行移出部分逻辑了。
+
+首先来到on_enter部分对每次开始时都进行先前对局状态的重置，所以对结束和滑出标记均赋值false并计算标题两层图片居中目标位置，随后设置两个控制动画效果的定时器属性，来到on_update最后累加结算标题两层图片水平坐标位置，并且根据当前是否滑出标志执行不同逻辑，若未滑出效果时只需要累加控制划入动画定时器，并让图片位置不要越过目标位置处即可，而当需要滑出时便不断更新控制滑出的定时器。
+
+来到on_draw绘图部分，修改当前状态条界面组件绘制代码，使其只有当游戏未结束时才渲染，而当游戏结束时便在对应位置上渲染结算标题的两层图片，具体的标题根据生命值是否归零进行判断，最后还要在on_exit中添加释放与重置代码，运行程序可以正确运行需求逻辑。
+
+```
+//gameScene.h引入资源
+extern IMAGE img_winner_bar;
+extern IMAGE img_1P_winner;
+extern IMAGE img_2P_winner;
+
+//gameScene.h添加成员变量
+bool is_slide_out_started = false;
+
+POINT m_pos_img_winner_bar = { 0 };
+POINT m_pos_img_winner_text = { 0 };
+
+int m_pos_x_img_winner_bar_dst = 0;
+int m_pos_x_img_winner_text_dst = 0;
+
+Timer m_timer_winner_slide_in;
+Timer m_timer_winner_slide_out;
+
+//gameScene.h添加on_enter代码
+
+
+this->is_game_over = false;
+this->is_slide_out_started = false;
+
+this->m_pos_img_winner_bar.x = -img_winner_bar.getwidth();
+this->m_pos_img_winner_bar.y = (getheight() - img_winner_bar.getheight()) / 2;
+this->m_pos_x_img_winner_bar_dst = (getwidth() - img_winner_bar.getwidth()) / 2;
+
+this->m_pos_img_winner_text.x = m_pos_img_winner_bar.x;
+this->m_pos_img_winner_text.y = (getheight() - img_1P_winner.getheight()) / 2;
+this->m_pos_x_img_winner_text_dst = (getwidth() - img_1P_winner.getwidth()) / 2;
+
+this->m_timer_winner_slide_in.restart();
+this->m_timer_winner_slide_in.setWaitTime(2500);
+this->m_timer_winner_slide_in.setOneShot(true);
+this->m_timer_winner_slide_in.setCallback([&]() {this->is_slide_out_started = true; });
+
+this->m_timer_winner_slide_out.restart();
+this->m_timer_winner_slide_out.setWaitTime(1000);
+this->m_timer_winner_slide_out.setOneShot(true);
+this->m_timer_winner_slide_out.setCallback([&]() {scene_manager.switchTo(SceneManager::SceneType::Menu); });
+
+//gameScene.h添加on_update代码
+if (this->is_game_over)
+{
+	this->m_pos_img_winner_bar.x += (int)(this->speed_winner_bar * delta);
+	this->m_pos_img_winner_text.x += (int)(this->speed_winner_text * delta);
+
+	if (!this->is_slide_out_started)
+	{
+		this->m_timer_winner_slide_in.on_updata(delta);
+		if (this->m_pos_img_winner_bar.x > this->m_pos_x_img_winner_bar_dst) this->m_pos_img_winner_bar.x = this->m_pos_x_img_winner_bar_dst;
+		if (this->m_pos_img_winner_text.x > this->m_pos_x_img_winner_text_dst) this->m_pos_img_winner_text.x = this->m_pos_x_img_winner_text_dst;
+	}
+	else
+	{
+		this->m_timer_winner_slide_out.on_updata(delta);
+	}
+}
+
+//on_draw方法中末尾增加修改
+if (this->is_game_over)
+{
+	putImageAlpha(this->m_pos_img_winner_bar.x, this->m_pos_img_winner_bar.y, &img_winner_bar);
+	putImageAlpha(this->m_pos_img_winner_text.x, this->m_pos_img_winner_text.y,
+		player_1->getHp() > 0 ? &img_1P_winner : &img_2P_winner);
+}
+else
+{
+	this->m_status_bar_1P.on_draw();
+	this->m_status_bar_2P.on_draw();
+}
+
+//on_exit增加代码
+delete player_1; player_1 = nullptr;
+delete player_2; player_2 = nullptr;
+
+is_debug = false;
+
+bullet_list.clear();
+main_camera.reset();
+
+```
+
+
+
+### 优化细节与死亡击飞特效
+
+由于希望角色朝向朝向场景中心，所以来到player.h给与构造函数添加一个参数facing_right使用其初始化内部成员变量，不过要注意既然添加了修改方向就要对当前动画进行切换，而基类提供了方法，子类也要添加对应参数，随后只需要将selectorScene.h中on_exit方法将2P玩家构造中传入对应参数。
+
+```
+//player.h构造修改
+Player(bool facing_right = true) : is_facing_right(facing_right)
+{
+	this->m_current_animaiton = this->is_facing_right ? &m_animation_idle_right : &m_animation_idle_left;
+	//...
+}
+
+//playerGamer1.h构造修改
+PlayerGamer1(bool facing_right = true) : Player(facing_right)
+{
+	//...
+}
+
+//playerGamer1.h构造修改
+PlayerGamer2(bool facing_right = true) : Player(facing_right)
+{
+	//...
+}
+
+//selectorScene.h的on_exit部分代码修改
+switch (this->m_player_type_2)
+{
+case PlayerType::Gamer1:
+	player_2 = new PlayerGamer1(false);
+	img_player_2_avatar = &img_avatar_gamer1;
+	break;
+case PlayerType::Gamer2:
+	player_2 = new PlayerGamer2(false);
+	img_player_2_avatar = &img_avatar_gamer2;
+	break;
+}
+
+```
+
+
+
+接下来希望开始时使用醒目光标指示两名玩家位置让刚进入对局玩家明确找到自己参考的游戏角色，所以来到player.h中，映入光标图片资源，类内添加光标可见性布尔数据与定时器设定仅进入后一段时间进行显示，随后构造中设定定时器，随后在更新方法中将定时器更新，最后在绘制中在光标可见时根据不同id选择绘制不同光标图片，当然要计算位置使其位于角色头顶居中位置并使用摄像机坐标对应玩家进行渲染。
+
+```
+//引入资源
+extern IMAGE img_1P_cursor;
+extern IMAGE img_2P_cursor;
+
+//类内声明变量
+bool is_cursor_visible = true;
+Timer m_timer_cursor_visibility;
+
+//构造方法
+this->m_timer_cursor_visibility.setWaitTime(2500);
+this->m_timer_cursor_visibility.setOneShot(true);
+this->m_timer_cursor_visibility.setCallback([&]() {this->is_cursor_visible = false; });
+
+//on_update
+this->m_timer_cursor_visibility.on_updata(delta);
+
+//on_draw
+if (this->is_cursor_visible)
+{
+	switch (this->m_id)
+	{
+	case PlayerId::P1:
+		putImageAlpha(camera, (int)(this->m_position.m_x + (this->m_size.m_x - img_1P_cursor.getwidth()) / 2), (int)(this->m_position.m_y - img_1P_cursor.getheight()), &img_1P_cursor);
+		break;
+	case PlayerId::P2:
+		putImageAlpha(camera, (int)(this->m_position.m_x + (this->m_size.m_x - img_2P_cursor.getwidth()) / 2), (int)(this->m_position.m_y - img_2P_cursor.getheight()), &img_2P_cursor);
+		break;
+	default:
+		break;
+	}
+}
+
+```
+
+
+
+为了让玩家死亡后飞跃起来，所以先来到player.h中，添加二维向量m_last_hurt_direction表示最后一次受击方向，随后可以来到moveAndCollide中在玩家根据生命值根据子弹削减后使用子单位制与玩家作差更新最后一次受击方向，而当生命值归零后便可根据最后一次受击方向向量设置其起飞水平速度和竖直速度，整体达到一个斜上抛运动效果，并且由于生命归零后不应进行碰撞，所以要提前添加生命值判断来进行跳过碰撞返回。
+
+对应的在受到最后一击并击飞的过程中也需要播放玩家死亡动画，所以成员变量中定义添加角色左右死亡动画，随后在on_update中生命归零时选择播放对应动画，最后就是在不同对应子类初始化部分对死亡动画初始化了，从playerGame1.h中与playerGamer2.h中分别引入对应的所需图集并在构造中设计图集与帧间隔，至此项目的所有部分编写完毕。
+
+```
+//player.h中moveAndCollide跳过碰撞
+if (this->m_hp <= 0) return;
+
+//player.h中moveAndCollide碰撞后设定抛向
+this->m_hp -= b->getDamage();
+this->m_last_hurt_direction = { b->getPosition().m_x - this->m_position.m_x, b->getPosition().m_y - this->m_position.m_y };
+if (this->m_hp <= 0)
+{
+				this->m_velocity.m_x = this->m_last_hurt_direction.m_x < 0 ? 0.35f : -0.35f;
+				this->m_velocity.m_y = -1.0f;
+}
+
+//player.h中添加变量
+Animation m_animation_die_left;
+Animation m_animation_die_right;
+
+//player.h中on_update
+if (this->m_hp <= 0) this->m_current_animaiton = this->m_last_hurt_direction.m_x < 0 ? &this->m_animation_die_left : &this->m_animation_die_right;
+
+//playerGamer1.h引入资源
+extern Atlas atlas_gamer1_die_left;
+extern Atlas atlas_gamer1_die_right;
+
+//playerGamer1.h构造
+this->m_animation_die_left.setAtlas(&atlas_gamer1_die_left);
+this->m_animation_die_right.setAtlas(&atlas_gamer1_die_right);
+
+this->m_animation_die_left.setInterval(150);
+this->m_animation_die_right.setInterval(150);
+
+this->m_animation_die_left.setLoop(false);
+this->m_animation_die_right.setLoop(false);
+
+//playerGamer2.h引入资源
+extern Atlas atlas_gamer2_die_left;
+extern Atlas atlas_gamer2_die_right;
+
+//playerGamer2.h构造
+this->m_animation_die_left.setAtlas(&atlas_gamer2_die_left);
+this->m_animation_die_right.setAtlas(&atlas_gamer2_die_right);
+
+this->m_animation_die_left.setInterval(150);
+this->m_animation_die_right.setInterval(150);
+
+this->m_animation_die_left.setLoop(false);
+this->m_animation_die_right.setLoop(false);
+```
 
 
 
 ## 第十六节完整代码
+
+**player.h**
+
+```
+#ifndef _PLAYER_H_
+#define _PLAYER_H_
+
+#include "camera.h"
+#include "vector2.h"
+#include "animation.h"
+#include "playerId.h"
+#include "platform.h"
+#include "bullet.h"
+#include "particle.h"
+
+#include <graphics.h>
+
+extern std::vector<Platform> platform_list;
+extern std::vector<Bullet*> bullet_list;
+
+extern Atlas atlas_run_effect;
+extern Atlas atlas_jump_effect;
+extern Atlas atlas_land_effect;
+
+extern IMAGE img_1P_cursor;
+extern IMAGE img_2P_cursor;
+
+extern bool is_debug;
+
+class Player
+{
+public:
+	Player(bool facing_right = true) : is_facing_right(facing_right)
+	{
+		this->m_current_animaiton = this->is_facing_right ? &m_animation_idle_right : &m_animation_idle_left;
+
+		this->m_current_animaiton = &this->m_animation_idle_right;
+
+		this->m_timer_invulnerable.setWaitTime(750);
+		this->m_timer_invulnerable.setOneShot(true);
+		this->m_timer_invulnerable.setCallback([&]() { this->is_invulnerable = false; });
+
+		this->m_timer_invulnerable_blink.setWaitTime(75);
+		this->m_timer_invulnerable_blink.setCallback([&]() {this->is_show_sketch_frame = !this->is_show_sketch_frame; });
+
+		this->m_timer_attack_cd.setWaitTime(this->m_attack_cd);
+		this->m_timer_attack_cd.setOneShot(true);
+		this->m_timer_attack_cd.setCallback([&]() {this->can_attack = true; });
+
+		this->m_timer_run_effect_generation.setWaitTime(75);
+		this->m_timer_run_effect_generation.setCallback([&]()
+			{
+				Vector2 particle_position;
+				IMAGE* frame = atlas_run_effect.getImage(0);
+				particle_position.m_x = this->m_position.m_x + (this->m_size.m_x - frame->getwidth()) / 2;
+				particle_position.m_y = this->m_position.m_y + this->m_size.m_y - frame->getheight();
+
+				m_particle_list.emplace_back(particle_position, &atlas_run_effect, 45);
+			});
+
+		this->m_timer_die_effect_generation.setWaitTime(35);
+		this->m_timer_die_effect_generation.setCallback([&]()
+			{
+				Vector2 particle_position;
+				IMAGE* frame = atlas_run_effect.getImage(0);
+				particle_position.m_x = this->m_position.m_x + (this->m_size.m_x - frame->getwidth()) / 2;
+				particle_position.m_y = this->m_position.m_y + this->m_size.m_y - frame->getheight();
+
+				m_particle_list.emplace_back(particle_position, &atlas_run_effect, 150);
+			});
+
+		this->m_animation_jump_effect.setAtlas(&atlas_jump_effect);
+		this->m_animation_jump_effect.setInterval(25);
+		this->m_animation_jump_effect.setLoop(false);
+		this->m_animation_jump_effect.setCallBack([&]() { this->is_jump_effect_visible = false; });
+
+		this->m_animation_land_effect.setAtlas(&atlas_land_effect);
+		this->m_animation_land_effect.setInterval(50);
+		this->m_animation_land_effect.setLoop(false);
+		this->m_animation_land_effect.setCallBack([&]() { this->is_land_effect_visible = false; });
+
+		this->m_timer_cursor_visibility.setWaitTime(2500);
+		this->m_timer_cursor_visibility.setOneShot(true);
+		this->m_timer_cursor_visibility.setCallback([&]() {this->is_cursor_visible = false; });
+
+	}
+
+	~Player() = default;
+
+	virtual void on_update(int delta)
+	{
+		if (this->is_attack_keydown)
+		{
+			if (this->can_attack)
+			{
+				this->on_attack();
+				this->can_attack = false;
+				this->m_timer_attack_cd.restart();
+			}
+		}
+
+		int direction = this->is_right_keydown - this->is_left_keydown;
+
+		if (direction != 0)
+		{
+			if (!this->is_attacking_ex) this->is_facing_right = direction > 0;
+
+			this->m_current_animaiton = is_facing_right ? &this->m_animation_run_right : &this->m_animation_run_left;
+			
+			float distance = direction * this->run_velocity * delta;
+			this->on_run(distance);
+		}
+		else
+		{
+			this->m_current_animaiton = is_facing_right ? &this->m_animation_idle_right : &this->m_animation_idle_left;
+			this->m_timer_run_effect_generation.pause();
+		}
+
+		if (this->is_attacking_ex) this->m_current_animaiton = this->is_facing_right ? &this->m_animation_attack_ex_right : &this->m_animation_attack_ex_left;
+
+		if (this->m_hp <= 0) this->m_current_animaiton = this->m_last_hurt_direction.m_x < 0 ? &this->m_animation_die_left : &this->m_animation_die_right;
+
+		this->m_current_animaiton->on_update(delta);
+		this->m_animation_jump_effect.on_update(delta);
+		this->m_animation_land_effect.on_update(delta);
+
+		this->m_timer_attack_cd.on_updata(delta);
+		this->m_timer_invulnerable.on_updata(delta);
+		this->m_timer_invulnerable_blink.on_updata(delta);
+		
+		this->m_timer_run_effect_generation.on_updata(delta);
+		this->m_timer_cursor_visibility.on_updata(delta);
+
+		if (this->m_hp <= 0) this->m_timer_die_effect_generation.on_updata(delta);
+
+		this->m_particle_list.erase(std::remove_if(
+		this->m_particle_list.begin(), this->m_particle_list.end(),
+			[](const Particle& particle) 
+			{
+				return !particle.checkValid();
+			}), this->m_particle_list.end());
+		for (Particle& p : this->m_particle_list) p.on_update(delta);
+
+		if (this->is_show_sketch_frame) sketchImage(this->m_current_animaiton->getFrame(), &this->m_img_sketch);
+
+		this->moveAndCollide(delta);
+	}
+
+	virtual void on_draw(const Camera& camera)
+	{
+		for (const Particle& p : this->m_particle_list) p.on_draw(camera);
+
+		if (this->is_jump_effect_visible) this->m_animation_jump_effect.on_draw(camera, (int)this->m_position_jump_effect.m_x, (int)this->m_position_jump_effect.m_y);
+		if (this->is_land_effect_visible) this->m_animation_land_effect.on_draw(camera, (int)this->m_position_land_effect.m_x, (int)this->m_position_land_effect.m_y);
+
+		if (this->m_hp > 0 && this->is_invulnerable && this->is_show_sketch_frame) putImageAlpha(camera, (int)this->m_position.m_x, (int)this->m_position.m_y, &this->m_img_sketch);
+		else this->m_current_animaiton->on_draw(camera, this->m_position.m_x, this->m_position.m_y);
+
+		if (this->is_cursor_visible)
+		{
+			switch (this->m_id)
+			{
+			case PlayerId::P1:
+				putImageAlpha(camera, (int)(this->m_position.m_x + (this->m_size.m_x - img_1P_cursor.getwidth()) / 2), (int)(this->m_position.m_y - img_1P_cursor.getheight()), &img_1P_cursor);
+				break;
+			case PlayerId::P2:
+				putImageAlpha(camera, (int)(this->m_position.m_x + (this->m_size.m_x - img_2P_cursor.getwidth()) / 2), (int)(this->m_position.m_y - img_2P_cursor.getheight()), &img_2P_cursor);
+				break;
+			default:
+				break;
+			}
+		}
+
+		if (is_debug)
+		{
+			setlinecolor(RGB(0, 125, 255));
+			rectangle((int)this->m_position.m_x, (int)this->m_position.m_y, (int)(this->m_position.m_x + this->m_size.m_x), (int)(this->m_position.m_y + this->m_size.m_y));
+		}
+	}
+
+	virtual void on_input(const ExMessage& msg)
+	{
+		switch (msg.message)
+		{
+		case WM_KEYDOWN:
+			switch (this->m_id)
+			{
+			case PlayerId::P1:
+				switch (msg.vkcode)
+				{
+				case 0x41://'A'
+					this->is_left_keydown = true;
+					break;
+				case 0x44://'D'
+					this->is_right_keydown = true;
+					break;
+				case 0x57://'W'
+					this->on_jump();
+					break;
+				case 0x46://'F'
+					this->is_attack_keydown = true;
+					break;
+				case 0x47://'G'
+					if (this->m_mp >= 100) this->m_mp = 0, this->on_attack_ex();
+					break;
+				}
+				break;
+			case PlayerId::P2:
+				switch (msg.vkcode)
+				{
+				case VK_LEFT://'←'
+					this->is_left_keydown = true;
+					break;
+				case VK_RIGHT://'→'
+					this->is_right_keydown = true;
+					break;
+				case VK_UP://'↑'
+					this->on_jump();
+					break;
+				case VK_OEM_PERIOD://'.'
+					this->is_attack_keydown = true;
+					break;
+				case VK_OEM_COMMA://','
+					if (this->m_mp >= 100) this->m_mp = 0, this->on_attack_ex();
+					break;
+				}
+				break;
+			}
+			break;
+		case WM_KEYUP:
+			switch (this->m_id)
+			{
+			case PlayerId::P1:
+				switch (msg.vkcode)
+				{
+				case 0x41://'A'
+					this->is_left_keydown = false;
+					break;
+				case 0x44://'D'
+					this->is_right_keydown = false;
+					break;
+				case 0x46://'F'
+					this->is_attack_keydown = false;
+					break;
+				}
+				break;
+			case PlayerId::P2:
+				switch (msg.vkcode)
+				{
+				case VK_LEFT://'←'
+					this->is_left_keydown = false;
+					break;
+				case VK_RIGHT://'→'
+					this->is_right_keydown = false;
+					break;
+				case VK_OEM_PERIOD://'.'
+					this->is_attack_keydown = false;
+					break;
+				}
+				break;
+			}
+			break;
+		}
+
+	}
+
+	void on_jump()
+	{
+		if (this->m_velocity.m_y != 0 || this->is_attacking_ex) return;
+
+		this->m_velocity.m_y += this->jump_velocity;
+		this->is_jump_effect_visible = true;
+		this->m_animation_jump_effect.reset();
+
+		IMAGE* effect_frame = this->m_animation_jump_effect.getFrame();
+		this->m_position_jump_effect.m_x = this->m_position.m_x + (this->m_size.m_x - effect_frame->getwidth()) / 2;
+		this->m_position_jump_effect.m_y = this->m_position.m_y + this->m_size.m_y - effect_frame->getheight();
+	}
+
+	void on_land()
+	{
+		this->is_land_effect_visible = true;
+		this->m_animation_land_effect.reset();
+
+		IMAGE* effect_frame = this->m_animation_land_effect.getFrame();
+		this->m_position_land_effect.m_x = this->m_position.m_x + (this->m_size.m_x - effect_frame->getwidth()) / 2;
+		this->m_position_land_effect.m_y = this->m_position.m_y + this->m_size.m_y - effect_frame->getheight();
+	}
+
+	void on_run(float destance) 
+	{
+		if (this->is_attacking_ex) return;
+
+		this->m_position.m_x += destance;
+		this->m_timer_run_effect_generation.resume();
+	}
+
+	void moveAndCollide(int delta)
+	{
+		float last_velocity_y = this->m_velocity.m_y;
+
+		this->m_velocity.m_y += this->gravity * delta;
+		this->m_position += this->m_velocity * (float)delta;
+
+		if (this->m_hp <= 0) return;
+
+		if (this->m_velocity.m_y > 0)
+		{
+			for (const Platform& pt : platform_list)
+			{
+				const Platform::CollisionShape& shape = pt.m_shape;
+
+				bool is_collide_x = (max(this->m_position.m_x + this->m_size.m_x, shape.right) - min(this->m_position.m_x, shape.left) <= this->m_size.m_x + (shape.right - shape.left));
+				bool is_collide_y = (shape.y >= this->m_position.m_y && shape.y <= this->m_position.m_y + this->m_size.m_y);
+
+				if (is_collide_x && is_collide_y)
+				{
+					float delta_pos_y = this->m_velocity.m_y * delta;
+					float last_tick_foot_pos_y = this->m_position.m_y + this->m_size.m_y - delta_pos_y;
+					if (last_tick_foot_pos_y <= shape.y)
+					{
+						this->m_position.m_y = shape.y - this->m_size.m_y;
+						this->m_velocity.m_y = 0;
+
+						if (last_velocity_y != 0) this->on_land();
+
+						break;
+					}
+				}
+			}
+		}
+
+		if (!this->is_invulnerable)
+		{
+			for (Bullet* b : bullet_list)
+			{
+				if (!b->getValid() || b->getCollideTarget() != this->m_id) continue;
+
+				if (b->checkCollide(this->m_position, this->m_size))
+				{
+					this->makeInvulnerable();
+
+					b->on_collide();
+					b->setValid(false);
+
+					this->m_hp -= b->getDamage();
+					this->m_last_hurt_direction = { b->getPosition().m_x - this->m_position.m_x, b->getPosition().m_y - this->m_position.m_y };
+					if (this->m_hp <= 0)
+					{
+						this->m_velocity.m_x = this->m_last_hurt_direction.m_x < 0 ? 0.35f : -0.35f;
+						this->m_velocity.m_y = -1.0f;
+					}
+				}
+			}
+		}
+	}
+
+	void makeInvulnerable()
+	{
+		this->is_invulnerable = true;
+		this->m_timer_invulnerable.restart();
+	}
+
+	void setId(PlayerId id) { this->m_id = id; }
+
+	void setPosition(int x, int y) { this->m_position.m_x = x, this->m_position.m_y = y; }
+
+	const Vector2& getPosition() const { return this->m_position; }
+
+	const Vector2& getSize() const { return this->m_size; }
+
+	const int getHp() const { return this->m_hp; }
+
+	void setHp(int hp) { this->m_hp = hp; }
+
+	const int getMp() const { return this->m_mp; }
+
+	virtual void on_attack() {}
+
+	virtual void on_attack_ex() {}
+
+protected:
+	int m_hp = 100;
+	int m_mp = 0;
+
+	Vector2 m_size;
+	Vector2 m_position;
+	Vector2 m_velocity;
+
+	Vector2 m_position_jump_effect;
+	Vector2 m_position_land_effect;
+
+	Animation m_animation_idle_left;
+	Animation m_animation_idle_right;
+	Animation m_animation_run_left;
+	Animation m_animation_run_right;
+	Animation m_animation_attack_ex_left;
+	Animation m_animation_attack_ex_right;
+	Animation m_animation_jump_effect;
+	Animation m_animation_land_effect;
+	Animation m_animation_die_left;
+	Animation m_animation_die_right;
+
+	Animation* m_current_animaiton = nullptr;
+
+	PlayerId m_id;
+
+	IMAGE m_img_sketch;
+
+	const float run_velocity = 0.55f;//水平移动速度
+	const float gravity = 0.0016f;//重力加速度
+	const float jump_velocity = -0.85f;//跳跃速度
+
+	bool is_jump_effect_visible = false;
+	bool is_land_effect_visible = false;
+
+	bool is_invulnerable = false;
+	bool is_show_sketch_frame = false;
+
+	bool is_left_keydown = false;
+	bool is_right_keydown = false;
+
+	bool is_facing_right = true;
+
+	bool is_attack_keydown = false;
+	bool is_attacking_ex = false;
+
+	bool is_cursor_visible = true;
+
+	bool can_attack = true;
+	int m_attack_cd = 500;
+
+	Timer m_timer_cursor_visibility;
+	Timer m_timer_attack_cd;
+	Timer m_timer_invulnerable;
+	Timer m_timer_invulnerable_blink;
+
+	std::vector<Particle> m_particle_list;
+
+	Timer m_timer_run_effect_generation;
+	Timer m_timer_die_effect_generation;
+
+	Vector2 m_last_hurt_direction;
+};
+
+#endif
+```
+
+**gameScene.h**
+
+```
+#ifndef _GAME_SCENE_H_
+#define _GAME_SCENE_H_
+
+#include "utils.h"
+#include "platform.h"
+#include "scene.h"
+#include "sceneManager.h"
+#include "player.h"
+#include "statusBar.h"
+
+extern Player* player_1;
+extern Player* player_2;
+
+extern IMAGE img_sky;
+extern IMAGE img_hills;
+extern IMAGE img_platform_large;
+extern IMAGE img_platform_small;
+
+extern IMAGE img_winner_bar;
+extern IMAGE img_1P_winner;
+extern IMAGE img_2P_winner;
+
+extern IMAGE* img_player_1_avatar;
+extern IMAGE* img_player_2_avatar;
+
+extern Camera main_camera;
+
+extern std::vector<Platform> platform_list;
+extern std::vector<Bullet*> bullet_list;
+
+extern SceneManager scene_manager;
+
+class GameScene : public Scene
+{
+public:
+	GameScene() = default;
+	~GameScene() = default;
+
+	virtual void on_enter()
+	{
+		this->is_game_over = false;
+		this->is_slide_out_started = false;
+
+		this->m_pos_img_winner_bar.x = -img_winner_bar.getwidth();
+		this->m_pos_img_winner_bar.y = (getheight() - img_winner_bar.getheight()) / 2;
+		this->m_pos_x_img_winner_bar_dst = (getwidth() - img_winner_bar.getwidth()) / 2;
+
+		this->m_pos_img_winner_text.x = this->m_pos_img_winner_bar.x;
+		this->m_pos_img_winner_text.y = (getheight() - img_1P_winner.getheight()) / 2;
+		this->m_pos_x_img_winner_text_dst = (getwidth() - img_1P_winner.getwidth()) / 2;
+
+		this->m_timer_winner_slide_in.restart();
+		this->m_timer_winner_slide_in.setWaitTime(2500);
+		this->m_timer_winner_slide_in.setOneShot(true);
+		this->m_timer_winner_slide_in.setCallback([&]() {this->is_slide_out_started = true; });
+
+		this->m_timer_winner_slide_out.restart();
+		this->m_timer_winner_slide_out.setWaitTime(1000);
+		this->m_timer_winner_slide_out.setOneShot(true);
+		this->m_timer_winner_slide_out.setCallback([&]() {scene_manager.switchTo(SceneManager::SceneType::Menu); });
+
+		this->m_status_bar_1P.setAvatar(img_player_1_avatar);
+		this->m_status_bar_2P.setAvatar(img_player_2_avatar);
+
+		this->m_status_bar_1P.setPosition(235, 625);
+		this->m_status_bar_2P.setPosition(675, 625);
+
+		player_1->setPosition(200, 50);
+		player_2->setPosition(975, 50);
+
+		this->pos_img_sky.x = (getwidth() - img_sky.getwidth()) / 2;
+		this->pos_img_sky.y = (getheight() - img_sky.getheight()) / 2;
+
+		this->pos_img_hills.x = (getwidth() - img_hills.getwidth()) / 2;
+		this->pos_img_hills.y = (getheight() - img_hills.getheight()) / 2;
+
+		platform_list.resize(4);
+		Platform& large_platform = platform_list[0];
+		large_platform.m_img = &img_platform_large;
+		large_platform.m_render_position.x = 122;
+		large_platform.m_render_position.y = 455;
+		large_platform.m_shape.left = (float)large_platform.m_render_position.x + 30;
+		large_platform.m_shape.right = (float)large_platform.m_render_position.x + img_platform_large.getwidth() - 30;
+		large_platform.m_shape.y = (float)large_platform.m_render_position.y + 60;
+
+		Platform& small_platform_1 = platform_list[1];
+		small_platform_1.m_img = &img_platform_small;
+		small_platform_1.m_render_position.x = 175;
+		small_platform_1.m_render_position.y = 360;
+		small_platform_1.m_shape.left = (float)small_platform_1.m_render_position.x + 40;
+		small_platform_1.m_shape.right = (float)small_platform_1.m_render_position.x + img_platform_small.getwidth() - 40;
+		small_platform_1.m_shape.y = (float)small_platform_1.m_render_position.y + img_platform_small.getheight() / 2;
+
+		Platform& small_platform_2 = platform_list[2];
+		small_platform_2.m_img = &img_platform_small;
+		small_platform_2.m_render_position.x = 855;
+		small_platform_2.m_render_position.y = 360;
+		small_platform_2.m_shape.left = (float)small_platform_2.m_render_position.x + 40;
+		small_platform_2.m_shape.right = (float)small_platform_2.m_render_position.x + img_platform_small.getwidth() - 40;
+		small_platform_2.m_shape.y = (float)small_platform_2.m_render_position.y + img_platform_small.getheight() / 2;
+
+		Platform& small_platform_3 = platform_list[3];
+		small_platform_3.m_img = &img_platform_small;
+		small_platform_3.m_render_position.x = 515;
+		small_platform_3.m_render_position.y = 255;
+		small_platform_3.m_shape.left = (float)small_platform_3.m_render_position.x + 40;
+		small_platform_3.m_shape.right = (float)small_platform_3.m_render_position.x + img_platform_small.getwidth() - 40;
+		small_platform_3.m_shape.y = (float)small_platform_3.m_render_position.y + img_platform_small.getheight() / 2;
+
+		mciSendString(L"play bgm_game repeat from 0", NULL, 0, NULL);
+	}
+
+	virtual void on_update(int delta)
+	{
+		player_1->on_update(delta);
+		player_2->on_update(delta);
+
+		main_camera.on_updata(delta);
+
+		bullet_list.erase(std::remove_if(bullet_list.begin(), bullet_list.end(), 
+			[](const Bullet* b)
+			{
+				bool deletable = b->checkCanRemove();
+				if (deletable) delete b;
+				return deletable;
+			}), 
+			bullet_list.end());
+
+		for (Bullet* b : bullet_list) b->on_update(delta);
+
+		const Vector2& position_player_1 = player_1->getPosition();
+		const Vector2& position_player_2 = player_2->getPosition();
+		if (position_player_1.m_y >= getheight()) player_1->setHp(0);
+		if (position_player_2.m_y >= getheight()) player_2->setHp(0);
+
+		if (player_1->getHp() <= 0 || player_2->getHp() <= 0)
+		{
+			if (!this->is_game_over)
+			{
+				mciSendString(L"stop bgm_game", NULL, 0, NULL);
+				mciSendString(L"play ui_win from 0", NULL, 0, NULL);
+			}
+
+			this->is_game_over = true;
+		}
+
+		this->m_status_bar_1P.setHp(player_1->getHp());
+		this->m_status_bar_1P.setMp(player_1->getMp());
+		this->m_status_bar_2P.setHp(player_2->getHp());
+		this->m_status_bar_2P.setMp(player_2->getMp());
+
+		if (this->is_game_over)
+		{
+			this->m_pos_img_winner_bar.x += (int)(this->speed_winner_bar * delta);
+			this->m_pos_img_winner_text.x += (int)(this->speed_winner_text * delta);
+
+			if (!this->is_slide_out_started)
+			{
+				this->m_timer_winner_slide_in.on_updata(delta);
+				if (this->m_pos_img_winner_bar.x > this->m_pos_x_img_winner_bar_dst) this->m_pos_img_winner_bar.x = this->m_pos_x_img_winner_bar_dst;
+				if (this->m_pos_img_winner_text.x > this->m_pos_x_img_winner_text_dst) this->m_pos_img_winner_text.x = this->m_pos_x_img_winner_text_dst;
+			}
+			else
+			{
+				this->m_timer_winner_slide_out.on_updata(delta);
+			}
+		}
+	}
+
+	virtual void on_draw(const Camera& camera) 
+	{
+		putImageAlpha(camera, this->pos_img_sky.x, this->pos_img_sky.y, &img_sky);
+		putImageAlpha(camera, this->pos_img_hills.x, this->pos_img_hills.y, &img_hills);
+
+		for (const Platform& p : platform_list) p.on_draw(camera);
+
+		player_1->on_draw(camera);
+		player_2->on_draw(camera);
+
+		for (const Bullet* b : bullet_list) b->on_draw(camera);
+		
+		if (this->is_game_over)
+		{
+			putImageAlpha(this->m_pos_img_winner_bar.x, this->m_pos_img_winner_bar.y, &img_winner_bar);
+			putImageAlpha(this->m_pos_img_winner_text.x, this->m_pos_img_winner_text.y,
+				player_1->getHp() > 0 ? &img_1P_winner : &img_2P_winner);
+		}
+		else
+		{
+			this->m_status_bar_1P.on_draw();
+			this->m_status_bar_2P.on_draw();
+		}
+	}
+
+	virtual void on_input(const ExMessage& msg)
+	{
+		player_1->on_input(msg);
+		player_2->on_input(msg);
+
+		switch (msg.message)
+		{
+		case WM_KEYDOWN:
+			break;
+		case WM_KEYUP:
+			switch (msg.vkcode)
+			{
+			case 0x51://'Q'
+				is_debug = !is_debug;
+				break;
+			default:
+				break;
+			}
+			break;
+		default:
+			break;
+		}
+	}
+
+	virtual void on_exit()
+	{
+		delete player_1; player_1 = nullptr;
+		delete player_2; player_2 = nullptr;
+
+		is_debug = false;
+
+		bullet_list.clear();
+		main_camera.reset();
+	}
+
+private:
+	const float speed_winner_bar = 3.0f;
+	const float speed_winner_text = 1.5f;
+
+	POINT pos_img_sky = { 0 };
+	POINT pos_img_hills = { 0 };
+
+	StatusBar m_status_bar_1P;
+	StatusBar m_status_bar_2P;
+
+	bool is_game_over = false;
+
+	bool is_slide_out_started = false;
+
+	POINT m_pos_img_winner_bar = { 0 };
+	POINT m_pos_img_winner_text = { 0 };
+
+	int m_pos_x_img_winner_bar_dst = 0;
+	int m_pos_x_img_winner_text_dst = 0;
+
+	Timer m_timer_winner_slide_in;
+	Timer m_timer_winner_slide_out;
+
+
+};
+
+#endif
+```
+
+**selectorScene.h**
+
+```
+#ifndef _SELECTOR_SCENE_H_
+#define _SELECTOR_SCENE_H_
+
+#include "utils.h"
+
+#include "scene.h"
+#include "sceneManager.h"
+
+#include "animation.h"
+
+#include "player.h"
+#include "playerGamer1.h"
+#include "playerGamer2.h"
+
+extern Player* player_1;
+extern Player* player_2;
+
+extern IMAGE img_VS;
+extern IMAGE img_1P;
+extern IMAGE img_2P;
+extern IMAGE img_1P_desc;
+extern IMAGE img_2P_desc;
+extern IMAGE img_select_background_left;
+extern IMAGE img_select_background_right;
+extern IMAGE img_selector_tip;
+extern IMAGE img_selector_background;
+extern IMAGE img_1P_selector_btn_idle_left;
+extern IMAGE img_1P_selector_btn_idle_right;
+extern IMAGE img_1P_selector_btn_down_left;
+extern IMAGE img_1P_selector_btn_down_right;
+extern IMAGE img_2P_selector_btn_idle_left;
+extern IMAGE img_2P_selector_btn_idle_right;
+extern IMAGE img_2P_selector_btn_down_left;
+extern IMAGE img_2P_selector_btn_down_right;
+extern IMAGE img_gamer1_selector_background_left;
+extern IMAGE img_gamer1_selector_background_right;
+extern IMAGE img_gamer2_selector_background_left;
+extern IMAGE img_gamer2_selector_background_right;
+
+extern Atlas atlas_gamer1_idle_right;
+extern Atlas atlas_gamer2_idle_right;
+
+extern IMAGE img_avatar_gamer1;
+extern IMAGE img_avatar_gamer2;
+
+extern SceneManager scene_manager;
+
+extern IMAGE* img_player_1_avatar;
+extern IMAGE* img_player_2_avatar;
+
+class SelectorScene : public Scene
+{
+public:
+	SelectorScene() = default;
+	~SelectorScene() = default;
+
+	virtual void on_enter() 
+	{
+		this->m_animation_gamer1.setAtlas(&atlas_gamer1_idle_right);
+		this->m_animation_gamer2.setAtlas(&atlas_gamer2_idle_right);
+		this->m_animation_gamer1.setInterval(100);
+		this->m_animation_gamer2.setInterval(100);
+
+		static const int OFFSET_X = 50;
+
+		this->pos_img_VS.x = (getwidth() - img_VS.getwidth()) / 2;
+		this->pos_img_VS.y = (getheight() - img_VS.getheight()) / 2;
+		this->pos_img_tip.x = (getwidth() - img_selector_tip.getwidth()) / 2;
+		this->pos_img_tip.y = getheight() - 125;
+		this->pos_img_1P.x = (getwidth() / 2 - img_1P.getwidth()) / 2 - OFFSET_X;
+		this->pos_img_1P.y = 35;
+		this->pos_img_2P.x = getwidth() / 2 + (getwidth() / 2 - img_2P.getwidth()) / 2 + OFFSET_X;
+		this->pos_img_2P.y = this->pos_img_1P.y;
+		this->pos_img_1P_desc.x = (getwidth() / 2 - img_1P_desc.getwidth()) / 2 - OFFSET_X;
+		this->pos_img_1P_desc.y = getheight() - 150;
+		this->pos_img_2P_desc.x = getwidth() / 2 + (getwidth() / 2 - img_2P_desc.getwidth()) / 2 + OFFSET_X;
+		this->pos_img_2P_desc.y = this->pos_img_1P_desc.y;
+		this->pos_img_1P_select_background.x = (getwidth() / 2 - img_select_background_right.getwidth()) / 2 - OFFSET_X;
+		this->pos_img_1P_select_background.y = this->pos_img_1P.y + img_1P.getwidth() + 35;
+		this->pos_img_2P_select_background.x = getwidth() / 2 + (getwidth() / 2 - img_select_background_left.getwidth()) / 2 + OFFSET_X;
+		this->pos_img_2P_select_background.y = this->pos_img_1P_select_background.y;
+		this->pos_animation_1P.x = (getwidth() / 2 - atlas_gamer1_idle_right.getImage(0)->getwidth()) / 2 - OFFSET_X;
+		this->pos_animation_1P.y = this->pos_img_1P_select_background.y + 80;
+		this->pos_animation_2P.x = getwidth() / 2 + (getwidth() / 2 - atlas_gamer1_idle_right.getImage(0)->getwidth()) / 2 + OFFSET_X;
+		this->pos_animation_2P.y = this->pos_animation_1P.y;
+		this->pos_img_1P_name.y = this->pos_animation_1P.y + 155;
+		this->pos_img_2P_name.y = this->pos_img_1P_name.y;
+		this->pos_1P_selector_btn_left.x = this->pos_img_1P_select_background.x - img_1P_selector_btn_idle_left.getwidth();
+		this->pos_1P_selector_btn_left.y = this->pos_img_1P_select_background.y + (img_select_background_right.getheight() - img_1P_selector_btn_idle_left.getheight()) / 2;
+		this->pos_1P_selector_btn_right.x = this->pos_img_1P_select_background.x + img_select_background_right.getwidth();
+		this->pos_1P_selector_btn_right.y = this->pos_1P_selector_btn_left.y;
+		this->pos_2P_selector_btn_left.x = this->pos_img_2P_select_background.x - img_2P_selector_btn_idle_left.getwidth();
+		this->pos_2P_selector_btn_left.y = this->pos_1P_selector_btn_left.y;
+		this->pos_2P_selector_btn_right.x = this->pos_img_2P_select_background.x + img_select_background_left.getwidth();
+		this->pos_2P_selector_btn_right.y = this->pos_1P_selector_btn_left.y;
+	}
+
+	virtual void on_update(int delta)
+	{
+		this->m_animation_gamer1.on_update(delta);
+		this->m_animation_gamer2.on_update(delta);
+
+		this->m_selector_background_scorll_offset_x += 5;
+		if (this->m_selector_background_scorll_offset_x >= img_gamer1_selector_background_left.getwidth())
+		{
+			this->m_selector_background_scorll_offset_x -= img_gamer1_selector_background_left.getwidth();
+		}
+	}
+
+	virtual void on_draw(const Camera& camera)
+	{
+		IMAGE* imgptr_P1_seletor_background = nullptr;
+		IMAGE* imgptr_P2_seletor_background = nullptr;
+
+		switch (this->m_player_type_1)
+		{
+		case PlayerType::Gamer1:
+			imgptr_P1_seletor_background = &img_gamer1_selector_background_left;
+			break;
+		case PlayerType::Gamer2:
+			imgptr_P1_seletor_background = &img_gamer2_selector_background_left;
+			break;
+		default:
+			imgptr_P1_seletor_background = &img_gamer1_selector_background_left;
+			break;
+		}
+
+		switch (this->m_player_type_2)
+		{
+		case PlayerType::Gamer1:
+			imgptr_P2_seletor_background = &img_gamer1_selector_background_left;
+			break;
+		case PlayerType::Gamer2:
+			imgptr_P2_seletor_background = &img_gamer2_selector_background_left;
+			break;
+		default:
+			imgptr_P2_seletor_background = &img_gamer1_selector_background_left;
+			break;
+		}
+
+		putimage(0, 0, &img_selector_background);
+
+		putImageAlpha(this->m_selector_background_scorll_offset_x - imgptr_P1_seletor_background->getwidth(), 0, imgptr_P1_seletor_background);
+		putImageAlpha(this->m_selector_background_scorll_offset_x, 0, imgptr_P1_seletor_background->getwidth() - this->m_selector_background_scorll_offset_x, 0, imgptr_P1_seletor_background, 0, 0);
+		putImageAlpha(getwidth() - this->m_selector_background_scorll_offset_x, 0, imgptr_P2_seletor_background);
+		putImageAlpha(getwidth() - imgptr_P2_seletor_background->getwidth(), 0, imgptr_P2_seletor_background->getwidth() - this->m_selector_background_scorll_offset_x, 0, imgptr_P2_seletor_background, this->m_selector_background_scorll_offset_x, 0);
+
+		putImageAlpha(this->pos_img_VS.x, this->pos_img_VS.y, &img_VS);
+
+		putImageAlpha(this->pos_img_1P.x, this->pos_img_1P.y, &img_1P);
+		putImageAlpha(this->pos_img_2P.x, this->pos_img_2P.y, &img_2P);
+		putImageAlpha(this->pos_img_1P_select_background.x, this->pos_img_1P_select_background.y, &img_select_background_right);
+		putImageAlpha(this->pos_img_2P_select_background.x, this->pos_img_2P_select_background.y, &img_select_background_left);
+
+		switch (this->m_player_type_1)
+		{
+		case PlayerType::Gamer1:
+			this->m_animation_gamer1.on_draw(camera, this->pos_animation_1P.x, this->pos_animation_1P.y);
+			this->pos_img_1P_name.x = this->pos_img_1P_select_background.x + (img_select_background_right.getwidth() - textwidth(this->str_gamer1_name)) / 2;
+			this->outtextxy_shaded(this->pos_img_1P_name.x, this->pos_img_1P_name.y, this->str_gamer1_name);
+			break;
+		case PlayerType::Gamer2:
+			this->m_animation_gamer2.on_draw(camera, this->pos_animation_1P.x, this->pos_animation_1P.y);
+			this->pos_img_1P_name.x = this->pos_img_1P_select_background.x + (img_select_background_right.getwidth() - textwidth(this->str_gamer2_name)) / 2;
+			this->outtextxy_shaded(this->pos_img_1P_name.x, this->pos_img_1P_name.y, this->str_gamer2_name);
+			break;
+		}
+		
+		switch (this->m_player_type_2)
+		{
+		case PlayerType::Gamer1:
+			this->m_animation_gamer1.on_draw(camera, this->pos_animation_2P.x, this->pos_animation_2P.y);
+			this->pos_img_2P_name.x = this->pos_img_2P_select_background.x + (img_select_background_left.getwidth() - textwidth(this->str_gamer1_name)) / 2;
+			this->outtextxy_shaded(this->pos_img_2P_name.x, this->pos_img_2P_name.y, this->str_gamer1_name);
+			break;
+		case PlayerType::Gamer2:
+			this->m_animation_gamer2.on_draw(camera, this->pos_animation_2P.x, this->pos_animation_2P.y);
+			this->pos_img_2P_name.x = this->pos_img_2P_select_background.x + (img_select_background_left.getwidth() - textwidth(this->str_gamer2_name)) / 2;
+			this->outtextxy_shaded(this->pos_img_2P_name.x, this->pos_img_2P_name.y, this->str_gamer2_name);
+			break;
+		}
+
+		putImageAlpha(this->pos_1P_selector_btn_left.x, this->pos_1P_selector_btn_left.y, this->is_btn_1P_left_down ? &img_1P_selector_btn_down_left : &img_1P_selector_btn_idle_left);
+		putImageAlpha(this->pos_1P_selector_btn_right.x, this->pos_1P_selector_btn_right.y, this->is_btn_1P_right_down ? &img_1P_selector_btn_down_right : &img_1P_selector_btn_idle_right);
+		putImageAlpha(this->pos_2P_selector_btn_left.x, this->pos_2P_selector_btn_left.y, this->is_btn_2P_left_down ? &img_2P_selector_btn_down_left : &img_2P_selector_btn_idle_left);
+		putImageAlpha(this->pos_2P_selector_btn_right.x, this->pos_2P_selector_btn_right.y, this->is_btn_2P_right_down ? &img_2P_selector_btn_down_right : &img_2P_selector_btn_idle_right);
+
+		putImageAlpha(this->pos_img_1P_desc.x, this->pos_img_1P_desc.y, &img_1P_desc);
+		putImageAlpha(this->pos_img_2P_desc.x, this->pos_img_2P_desc.y, &img_2P_desc);
+
+		putImageAlpha(this->pos_img_tip.x, this->pos_img_tip.y, &img_selector_tip);
+	}
+
+	virtual void on_input(const ExMessage& msg)
+	{
+		switch (msg.message)
+		{
+		case WM_KEYDOWN:
+			switch (msg.vkcode)
+			{
+			case 0x41://'A'
+				this->is_btn_1P_left_down = true;
+				break;
+			case 0x44://'D'
+				this->is_btn_1P_right_down = true;
+				break;
+			case VK_LEFT://'←'
+				this->is_btn_2P_left_down = true;
+				break;
+			case VK_RIGHT://'→'
+				this->is_btn_2P_right_down = true;
+				break;
+			}
+			break;
+		case WM_KEYUP:
+			switch (msg.vkcode)
+			{
+			case 0x41://'A'
+				this->is_btn_1P_left_down = false;
+				this->m_player_type_1 = (PlayerType)(((int)PlayerType::Invalid + (int)this->m_player_type_1 - 1) % (int)PlayerType::Invalid);
+				mciSendString(L"play ui_switch from 0", NULL, 0, NULL);
+				break;
+			case 0x44://'D'
+				this->is_btn_1P_right_down = false;
+				this->m_player_type_1 = (PlayerType)(((int)this->m_player_type_1 + 1) % (int)PlayerType::Invalid);
+				mciSendString(L"play ui_switch from 0", NULL, 0, NULL);
+				break;
+			case VK_LEFT://'←'
+				this->is_btn_2P_left_down = false;
+				this->m_player_type_2 = (PlayerType)(((int)PlayerType::Invalid + (int)this->m_player_type_2 - 1) % (int)PlayerType::Invalid);
+				mciSendString(L"play ui_switch from 0", NULL, 0, NULL);
+				break;
+			case VK_RIGHT://'→'
+				this->is_btn_2P_right_down = false;
+				this->m_player_type_2 = (PlayerType)(((int)this->m_player_type_2 + 1) % (int)PlayerType::Invalid);
+				mciSendString(L"play ui_switch from 0", NULL, 0, NULL);
+				break;
+			case VK_RETURN:
+				scene_manager.switchTo(SceneManager::SceneType::Game);
+				mciSendString(L"play ui_confirm from 0", NULL, 0, NULL);
+				break;
+			}
+			break;
+		default:
+			break;
+		}
+	}
+
+	virtual void on_exit()
+	{
+		switch (this->m_player_type_1)
+		{
+		case PlayerType::Gamer1:
+			player_1 = new PlayerGamer1();
+			img_player_1_avatar = &img_avatar_gamer1;
+			break;
+		case PlayerType::Gamer2:
+			player_1 = new PlayerGamer2();
+			img_player_1_avatar = &img_avatar_gamer2;
+			break;
+		}
+		player_1->setId(PlayerId::P1);
+
+		switch (this->m_player_type_2)
+		{
+		case PlayerType::Gamer1:
+			player_2 = new PlayerGamer1(false);
+			img_player_2_avatar = &img_avatar_gamer1;
+			break;
+		case PlayerType::Gamer2:
+			player_2 = new PlayerGamer2(false);
+			img_player_2_avatar = &img_avatar_gamer2;
+			break;
+		}
+		player_2->setId(PlayerId::P2);
+
+		mciSendString(L"stop bgm_menu", NULL, 0, NULL);
+	}
+
+private:
+	void outtextxy_shaded(int x, int y, LPCTSTR str)
+	{
+		settextcolor(RGB(45, 45, 45));
+		outtextxy(x + 3, y + 3, str);
+		settextcolor(RGB(255, 255, 255));
+		outtextxy(x, y, str);
+	}
+
+private:
+	enum class PlayerType
+	{
+		Gamer1,
+		Gamer2,
+		Invalid
+	};
+
+private:
+	bool is_btn_1P_left_down = false;
+	bool is_btn_1P_right_down = false;
+	bool is_btn_2P_left_down = false;
+	bool is_btn_2P_right_down = false;
+
+private:
+	POINT pos_img_VS = { 0 };
+	POINT pos_img_tip = { 0 };
+	POINT pos_img_1P = { 0 };
+	POINT pos_img_2P = { 0 };
+	POINT pos_img_1P_desc = { 0 };
+	POINT pos_img_2P_desc = { 0 };
+	POINT pos_img_1P_name = { 0 };
+	POINT pos_img_2P_name = { 0 };
+	POINT pos_animation_1P = { 0 };
+	POINT pos_animation_2P = { 0 };
+	POINT pos_img_1P_select_background = { 0 };
+	POINT pos_img_2P_select_background = { 0 };
+	POINT pos_1P_selector_btn_left = { 0 };
+	POINT pos_2P_selector_btn_left = { 0 };
+	POINT pos_1P_selector_btn_right = { 0 };
+	POINT pos_2P_selector_btn_right = { 0 };
+
+	Animation m_animation_gamer1;
+	Animation m_animation_gamer2;
+
+	PlayerType m_player_type_1 = PlayerType::Gamer1;
+	PlayerType m_player_type_2 = PlayerType::Gamer2;
+
+	LPCTSTR str_gamer1_name = L" 角色 1 ";
+	LPCTSTR str_gamer2_name = L" 角色 2 ";
+
+	int m_selector_background_scorll_offset_x = 0;
+
+};
+
+#endif
+```
+
+**playerGamer1.h**
+
+```
+#ifndef _PLAYERGAMER1_H_
+#define _PLAYERGAMER1_H_
+
+#include "player.h"
+#include "gamer1Bullet.h"
+
+extern Atlas atlas_gamer1_idle_left;
+extern Atlas atlas_gamer1_idle_right;
+extern Atlas atlas_gamer1_run_left;
+extern Atlas atlas_gamer1_run_right;
+extern Atlas atlas_gamer1_attack_ex_left;
+extern Atlas atlas_gamer1_attack_ex_right;
+extern Atlas atlas_gamer1_die_left;
+extern Atlas atlas_gamer1_die_right;
+
+
+class PlayerGamer1 : public Player
+{
+public:
+	PlayerGamer1(bool facing_right = true) : Player(facing_right)
+	{
+		this->m_animation_idle_left.setAtlas(&atlas_gamer1_idle_left);
+		this->m_animation_idle_right.setAtlas(&atlas_gamer1_idle_right);
+		this->m_animation_run_left.setAtlas(&atlas_gamer1_run_left);
+		this->m_animation_run_right.setAtlas(&atlas_gamer1_run_right);
+		this->m_animation_attack_ex_left.setAtlas(&atlas_gamer1_attack_ex_left);
+		this->m_animation_attack_ex_right.setAtlas(&atlas_gamer1_attack_ex_right);
+		this->m_animation_die_left.setAtlas(&atlas_gamer1_die_left);
+		this->m_animation_die_right.setAtlas(&atlas_gamer1_die_right);
+
+		this->m_animation_idle_left.setInterval(75);
+		this->m_animation_idle_right.setInterval(75);
+		this->m_animation_run_left.setInterval(75);
+		this->m_animation_run_right.setInterval(75);
+		this->m_animation_attack_ex_left.setInterval(75);
+		this->m_animation_attack_ex_right.setInterval(75);
+
+		this->m_animation_die_left.setInterval(150);
+		this->m_animation_die_right.setInterval(150);
+
+		this->m_animation_die_left.setLoop(false);
+		this->m_animation_die_right.setLoop(false);
+
+		this->m_size.m_x = 96;
+		this->m_size.m_y = 96;
+
+		this->m_timer_attack_ex.setWaitTime(this->attack_ex_duration);
+		this->m_timer_attack_ex.setOneShot(true);
+		this->m_timer_attack_ex.setCallback([&]() {this->is_attacking_ex = false; });
+
+		this->m_timer_spawn_bullet_ex.setWaitTime(100);
+		this->m_timer_spawn_bullet_ex.setOneShot(false);
+		this->m_timer_spawn_bullet_ex.setCallback([&]() {this->spawnBullet1(this->speed_bullet_ex); });
+
+		this->m_attack_cd = 100;
+	}
+
+	~PlayerGamer1() = default;
+
+	virtual void on_update(int delta)
+	{
+		Player::on_update(delta);
+
+		if (this->is_attacking_ex)
+		{
+			main_camera.shake(5, 100);
+			this->m_timer_attack_ex.on_updata(delta);
+			this->m_timer_spawn_bullet_ex.on_updata(delta);
+		}
+	}
+
+	void spawnBullet1(float speed)
+	{
+		Bullet* bullet = new Gamer1Bullet();
+		
+		Vector2 bullet_position, bullet_velocity;
+		const Vector2& bullet_size = bullet->getSize();
+
+		bullet_position.m_x = this->is_facing_right ? this->m_position.m_x + this->m_size.m_x - bullet_size.m_x / 2 : this->m_position.m_x - bullet_size.m_x / 2;
+		bullet_position.m_y = this->m_position.m_y;
+
+		bullet_velocity.m_x = this->is_facing_right ? speed : -speed;
+		bullet_velocity.m_y = 0;
+
+		bullet->setPosition(bullet_position.m_x, bullet_position.m_y);
+		bullet->setVelocity(bullet_velocity.m_x, bullet_velocity.m_y);
+
+		bullet->setCollideTarget(this->m_id == PlayerId::P1 ? PlayerId::P2 : PlayerId::P1);
+		bullet->setCallback([&]() {this->m_mp += 25; });
+
+		bullet_list.push_back(bullet);
+	}
+
+	void on_attack()
+	{
+		this->spawnBullet1(this->speed_bullet);
+
+		switch (rand() % 2)
+		{
+		case 0:
+			mciSendString(L"play gamer1_bullet_shoot_1 from 0", NULL, 0, NULL);
+			break;
+		case 1:
+			mciSendString(L"play gamer1_bullet_shoot_2 from 0", NULL, 0, NULL);
+			break;
+		}
+	}
+
+	void on_attack_ex()
+	{
+		this->is_attacking_ex = true;
+		this->m_timer_attack_ex.restart();
+
+		mciSendString(L"play gamer1_bullet_shoot_ex from 500", NULL, 0, NULL);
+
+		this->is_facing_right ? this->m_animation_attack_ex_right.reset() : this->m_animation_attack_ex_left.reset();
+	}
+
+private:
+	const float speed_bullet = 0.75f;
+	const float speed_bullet_ex = 1.5f;
+	const int attack_ex_duration = 2500;
+
+	Timer m_timer_attack_ex;
+	Timer m_timer_spawn_bullet_ex;
+
+};
+
+#endif // !_PLAYERGAMER1_H_
+
+```
+
+**playerGamer2.h**
+
+```
+#ifndef _PLAYERGAMER2_H_
+#define _PLAYERGAMER2_H_
+
+#include "player.h"
+#include "gamer2Bullet.h"
+#include "gamer2BulletEx.h"
+
+extern Atlas atlas_gamer2_idle_left;
+extern Atlas atlas_gamer2_idle_right;
+extern Atlas atlas_gamer2_run_left;
+extern Atlas atlas_gamer2_run_right;
+extern Atlas atlas_gamer2_attack_ex_left;
+extern Atlas atlas_gamer2_attack_ex_right;
+extern Atlas atlas_gamer2_bullet_text;
+extern Atlas atlas_gamer2_die_left;
+extern Atlas atlas_gamer2_die_right;
+
+extern Player* player_1;
+extern Player* player_2;
+
+class PlayerGamer2 : public Player
+{
+public:
+	PlayerGamer2(bool facing_right = true) : Player(facing_right)
+	{
+		this->m_animation_idle_left.setAtlas(&atlas_gamer2_idle_left);
+		this->m_animation_idle_right.setAtlas(&atlas_gamer2_idle_right);
+		this->m_animation_run_left.setAtlas(&atlas_gamer2_run_left);
+		this->m_animation_run_right.setAtlas(&atlas_gamer2_run_right);
+		this->m_animation_attack_ex_left.setAtlas(&atlas_gamer2_attack_ex_left);
+		this->m_animation_attack_ex_right.setAtlas(&atlas_gamer2_attack_ex_right);
+		this->m_animation_bullet_text.setAtlas(&atlas_gamer2_bullet_text);
+		this->m_animation_die_left.setAtlas(&atlas_gamer2_die_left);
+		this->m_animation_die_right.setAtlas(&atlas_gamer2_die_right);
+
+		this->m_animation_idle_left.setInterval(75);
+		this->m_animation_idle_right.setInterval(75);
+		this->m_animation_run_left.setInterval(75);
+		this->m_animation_run_right.setInterval(75);
+		this->m_animation_attack_ex_left.setInterval(100);
+		this->m_animation_attack_ex_right.setInterval(100);
+		this->m_animation_bullet_text.setInterval(100);
+
+		this->m_animation_die_left.setInterval(150);
+		this->m_animation_die_right.setInterval(150);
+
+		this->m_animation_die_left.setLoop(false);
+		this->m_animation_die_right.setLoop(false);
+
+		this->m_animation_attack_ex_left.setLoop(false);
+		this->m_animation_attack_ex_right.setLoop(false);
+		this->m_animation_bullet_text.setLoop(false);
+
+		this->m_animation_attack_ex_left.setCallBack([&]() { this->is_bullet_ex_visible = this->is_attacking_ex = false; });
+		this->m_animation_attack_ex_right.setCallBack([&]() { this->is_bullet_ex_visible = this->is_attacking_ex = false; });
+
+		this->m_size.m_x = 96;
+		this->m_size.m_y = 96;
+
+		this->m_attack_cd = 250;
+	}
+
+	~PlayerGamer2() = default;
+
+	virtual void on_update(int delta)
+	{
+		Player::on_update(delta);
+
+		if (this->is_bullet_ex_visible) this->m_animation_bullet_text.on_update(delta);
+	}
+	
+	virtual void on_draw(const Camera& camera)
+	{
+		Player::on_draw(camera);
+
+		if (this->is_bullet_ex_visible)
+		{
+			Vector2 text_position;
+			IMAGE* frame = this->m_animation_bullet_text.getFrame();
+
+			text_position.m_x = this->m_position.m_x - (this->m_size.m_x - frame->getwidth()) / 2;
+			text_position.m_y = this->m_position.m_y - frame->getheight();
+
+			this->m_animation_bullet_text.on_draw(camera, (int)text_position.m_x, (int)text_position.m_y);
+		}
+	}
+
+	void on_attack()
+	{
+		Bullet* bullet = new Gamer2Bullet();
+
+		Vector2 bullet_positon;
+		const Vector2& bullet_size = bullet->getSize();
+		bullet_positon.m_x = this->m_position.m_x + (this->m_size.m_x - bullet_size.m_x) / 2;
+		bullet_positon.m_y = this->m_position.m_y;
+
+		bullet->setPosition(bullet_positon.m_x, bullet_positon.m_y);
+		bullet->setVelocity(is_facing_right ? this->velocity_bullet.m_x : -this->velocity_bullet.m_x, this->velocity_bullet.m_y);
+
+		bullet->setCollideTarget(this->m_id == PlayerId::P1 ? PlayerId::P2 : PlayerId::P1);
+		bullet->setCallback([&]() { this->m_mp += 35; });
+
+		bullet_list.push_back(bullet);
+	}
+
+	void on_attack_ex()
+	{
+		this->is_attacking_ex = true;
+		this->is_bullet_ex_visible = true;
+
+		this->m_animation_bullet_text.reset();
+		this->is_facing_right ? this->m_animation_attack_ex_right.reset() : this->m_animation_attack_ex_right.reset();
+
+		Bullet* bullet = new Gamer2BulletEx();
+		Player* target = (this->m_id == PlayerId::P1 ? player_2 : player_1);
+
+		Vector2 bullet_position, bullet_velocity;
+		const Vector2& bullet_size = bullet->getSize();
+		const Vector2& target_size = target->getSize();
+		const Vector2& target_position = target->getPosition();
+
+		bullet_position.m_x = target_position.m_x + (target_size.m_x - bullet_size.m_x) / 2;
+		bullet_position.m_y = -this->m_size.m_y;
+		bullet_velocity.m_x = 0;
+		bullet_velocity.m_y = this->speed_bullet_ex;
+
+		bullet->setPosition(bullet_position.m_x, bullet_position.m_y);
+		bullet->setVelocity(bullet_velocity.m_x, bullet_velocity.m_y);
+
+		bullet->setCollideTarget(this->m_id == PlayerId::P1 ? PlayerId::P2 : PlayerId::P1);
+
+		bullet->setCallback([&]() {this->m_mp += 30; });
+
+		bullet_list.push_back(bullet);
+		mciSendString(L"play gamer2_bullet_text from 0", NULL, 0, NULL);
+	}
+
+private:
+	const float speed_bullet_ex = 0.15f;
+	const Vector2 velocity_bullet = { 0.25f, -0.5f };
+
+	bool is_bullet_ex_visible = false;//设置是否现实特殊攻击子弹顶部文本
+
+	Animation m_animation_bullet_text;
+
+};
+
+#endif // !_PLAYERGAMER2_H_
+```
+
