@@ -264,11 +264,11 @@ public:
 		switch (this->m_player_type_2)
 		{
 		case PlayerType::Gamer1:
-			player_2 = new PlayerGamer1();
+			player_2 = new PlayerGamer1(false);
 			img_player_2_avatar = &img_avatar_gamer1;
 			break;
 		case PlayerType::Gamer2:
-			player_2 = new PlayerGamer2();
+			player_2 = new PlayerGamer2(false);
 			img_player_2_avatar = &img_avatar_gamer2;
 			break;
 		}

@@ -16,6 +16,10 @@ extern IMAGE img_hills;
 extern IMAGE img_platform_large;
 extern IMAGE img_platform_small;
 
+extern IMAGE img_winner_bar;
+extern IMAGE img_1P_winner;
+extern IMAGE img_2P_winner;
+
 extern IMAGE* img_player_1_avatar;
 extern IMAGE* img_player_2_avatar;
 
@@ -34,6 +38,27 @@ public:
 
 	virtual void on_enter()
 	{
+		this->is_game_over = false;
+		this->is_slide_out_started = false;
+
+		this->m_pos_img_winner_bar.x = -img_winner_bar.getwidth();
+		this->m_pos_img_winner_bar.y = (getheight() - img_winner_bar.getheight()) / 2;
+		this->m_pos_x_img_winner_bar_dst = (getwidth() - img_winner_bar.getwidth()) / 2;
+
+		this->m_pos_img_winner_text.x = this->m_pos_img_winner_bar.x;
+		this->m_pos_img_winner_text.y = (getheight() - img_1P_winner.getheight()) / 2;
+		this->m_pos_x_img_winner_text_dst = (getwidth() - img_1P_winner.getwidth()) / 2;
+
+		this->m_timer_winner_slide_in.restart();
+		this->m_timer_winner_slide_in.setWaitTime(2500);
+		this->m_timer_winner_slide_in.setOneShot(true);
+		this->m_timer_winner_slide_in.setCallback([&]() {this->is_slide_out_started = true; });
+
+		this->m_timer_winner_slide_out.restart();
+		this->m_timer_winner_slide_out.setWaitTime(1000);
+		this->m_timer_winner_slide_out.setOneShot(true);
+		this->m_timer_winner_slide_out.setCallback([&]() {scene_manager.switchTo(SceneManager::SceneType::Menu); });
+
 		this->m_status_bar_1P.setAvatar(img_player_1_avatar);
 		this->m_status_bar_2P.setAvatar(img_player_2_avatar);
 
@@ -123,6 +148,23 @@ public:
 		this->m_status_bar_1P.setMp(player_1->getMp());
 		this->m_status_bar_2P.setHp(player_2->getHp());
 		this->m_status_bar_2P.setMp(player_2->getMp());
+
+		if (this->is_game_over)
+		{
+			this->m_pos_img_winner_bar.x += (int)(this->speed_winner_bar * delta);
+			this->m_pos_img_winner_text.x += (int)(this->speed_winner_text * delta);
+
+			if (!this->is_slide_out_started)
+			{
+				this->m_timer_winner_slide_in.on_updata(delta);
+				if (this->m_pos_img_winner_bar.x > this->m_pos_x_img_winner_bar_dst) this->m_pos_img_winner_bar.x = this->m_pos_x_img_winner_bar_dst;
+				if (this->m_pos_img_winner_text.x > this->m_pos_x_img_winner_text_dst) this->m_pos_img_winner_text.x = this->m_pos_x_img_winner_text_dst;
+			}
+			else
+			{
+				this->m_timer_winner_slide_out.on_updata(delta);
+			}
+		}
 	}
 
 	virtual void on_draw(const Camera& camera) 
@@ -136,9 +178,18 @@ public:
 		player_2->on_draw(camera);
 
 		for (const Bullet* b : bullet_list) b->on_draw(camera);
-
-		this->m_status_bar_1P.on_draw();
-		this->m_status_bar_2P.on_draw();
+		
+		if (this->is_game_over)
+		{
+			putImageAlpha(this->m_pos_img_winner_bar.x, this->m_pos_img_winner_bar.y, &img_winner_bar);
+			putImageAlpha(this->m_pos_img_winner_text.x, this->m_pos_img_winner_text.y,
+				player_1->getHp() > 0 ? &img_1P_winner : &img_2P_winner);
+		}
+		else
+		{
+			this->m_status_bar_1P.on_draw();
+			this->m_status_bar_2P.on_draw();
+		}
 	}
 
 	virtual void on_input(const ExMessage& msg)
@@ -165,9 +216,21 @@ public:
 		}
 	}
 
-	virtual void on_exit() {}
+	virtual void on_exit()
+	{
+		delete player_1; player_1 = nullptr;
+		delete player_2; player_2 = nullptr;
+
+		is_debug = false;
+
+		bullet_list.clear();
+		main_camera.reset();
+	}
 
 private:
+	const float speed_winner_bar = 3.0f;
+	const float speed_winner_text = 1.5f;
+
 	POINT pos_img_sky = { 0 };
 	POINT pos_img_hills = { 0 };
 
@@ -175,6 +238,18 @@ private:
 	StatusBar m_status_bar_2P;
 
 	bool is_game_over = false;
+
+	bool is_slide_out_started = false;
+
+	POINT m_pos_img_winner_bar = { 0 };
+	POINT m_pos_img_winner_text = { 0 };
+
+	int m_pos_x_img_winner_bar_dst = 0;
+	int m_pos_x_img_winner_text_dst = 0;
+
+	Timer m_timer_winner_slide_in;
+	Timer m_timer_winner_slide_out;
+
 
 };
 

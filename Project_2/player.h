@@ -18,13 +18,18 @@ extern Atlas atlas_run_effect;
 extern Atlas atlas_jump_effect;
 extern Atlas atlas_land_effect;
 
+extern IMAGE img_1P_cursor;
+extern IMAGE img_2P_cursor;
+
 extern bool is_debug;
 
 class Player
 {
 public:
-	Player()
+	Player(bool facing_right = true) : is_facing_right(facing_right)
 	{
+		this->m_current_animaiton = this->is_facing_right ? &m_animation_idle_right : &m_animation_idle_left;
+
 		this->m_current_animaiton = &this->m_animation_idle_right;
 
 		this->m_timer_invulnerable.setWaitTime(750);
@@ -69,6 +74,11 @@ public:
 		this->m_animation_land_effect.setInterval(50);
 		this->m_animation_land_effect.setLoop(false);
 		this->m_animation_land_effect.setCallBack([&]() { this->is_land_effect_visible = false; });
+
+		this->m_timer_cursor_visibility.setWaitTime(2500);
+		this->m_timer_cursor_visibility.setOneShot(true);
+		this->m_timer_cursor_visibility.setCallback([&]() {this->is_cursor_visible = false; });
+
 	}
 
 	~Player() = default;
@@ -104,6 +114,8 @@ public:
 
 		if (this->is_attacking_ex) this->m_current_animaiton = this->is_facing_right ? &this->m_animation_attack_ex_right : &this->m_animation_attack_ex_left;
 
+		if (this->m_hp <= 0) this->m_current_animaiton = this->m_last_hurt_direction.m_x < 0 ? &this->m_animation_die_left : &this->m_animation_die_right;
+
 		this->m_current_animaiton->on_update(delta);
 		this->m_animation_jump_effect.on_update(delta);
 		this->m_animation_land_effect.on_update(delta);
@@ -113,6 +125,8 @@ public:
 		this->m_timer_invulnerable_blink.on_updata(delta);
 		
 		this->m_timer_run_effect_generation.on_updata(delta);
+		this->m_timer_cursor_visibility.on_updata(delta);
+
 		if (this->m_hp <= 0) this->m_timer_die_effect_generation.on_updata(delta);
 
 		this->m_particle_list.erase(std::remove_if(
@@ -137,6 +151,21 @@ public:
 
 		if (this->m_hp > 0 && this->is_invulnerable && this->is_show_sketch_frame) putImageAlpha(camera, (int)this->m_position.m_x, (int)this->m_position.m_y, &this->m_img_sketch);
 		else this->m_current_animaiton->on_draw(camera, this->m_position.m_x, this->m_position.m_y);
+
+		if (this->is_cursor_visible)
+		{
+			switch (this->m_id)
+			{
+			case PlayerId::P1:
+				putImageAlpha(camera, (int)(this->m_position.m_x + (this->m_size.m_x - img_1P_cursor.getwidth()) / 2), (int)(this->m_position.m_y - img_1P_cursor.getheight()), &img_1P_cursor);
+				break;
+			case PlayerId::P2:
+				putImageAlpha(camera, (int)(this->m_position.m_x + (this->m_size.m_x - img_2P_cursor.getwidth()) / 2), (int)(this->m_position.m_y - img_2P_cursor.getheight()), &img_2P_cursor);
+				break;
+			default:
+				break;
+			}
+		}
 
 		if (is_debug)
 		{
@@ -269,6 +298,8 @@ public:
 		this->m_velocity.m_y += this->gravity * delta;
 		this->m_position += this->m_velocity * (float)delta;
 
+		if (this->m_hp <= 0) return;
+
 		if (this->m_velocity.m_y > 0)
 		{
 			for (const Platform& pt : platform_list)
@@ -309,6 +340,12 @@ public:
 					b->setValid(false);
 
 					this->m_hp -= b->getDamage();
+					this->m_last_hurt_direction = { b->getPosition().m_x - this->m_position.m_x, b->getPosition().m_y - this->m_position.m_y };
+					if (this->m_hp <= 0)
+					{
+						this->m_velocity.m_x = this->m_last_hurt_direction.m_x < 0 ? 0.35f : -0.35f;
+						this->m_velocity.m_y = -1.0f;
+					}
 				}
 			}
 		}
@@ -357,6 +394,8 @@ protected:
 	Animation m_animation_attack_ex_right;
 	Animation m_animation_jump_effect;
 	Animation m_animation_land_effect;
+	Animation m_animation_die_left;
+	Animation m_animation_die_right;
 
 	Animation* m_current_animaiton = nullptr;
 
@@ -382,9 +421,12 @@ protected:
 	bool is_attack_keydown = false;
 	bool is_attacking_ex = false;
 
+	bool is_cursor_visible = true;
+
 	bool can_attack = true;
 	int m_attack_cd = 500;
 
+	Timer m_timer_cursor_visibility;
 	Timer m_timer_attack_cd;
 	Timer m_timer_invulnerable;
 	Timer m_timer_invulnerable_blink;
@@ -394,6 +436,7 @@ protected:
 	Timer m_timer_run_effect_generation;
 	Timer m_timer_die_effect_generation;
 
+	Vector2 m_last_hurt_direction;
 };
 
 #endif

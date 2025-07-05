@@ -12,6 +12,8 @@ extern Atlas atlas_gamer2_run_right;
 extern Atlas atlas_gamer2_attack_ex_left;
 extern Atlas atlas_gamer2_attack_ex_right;
 extern Atlas atlas_gamer2_bullet_text;
+extern Atlas atlas_gamer2_die_left;
+extern Atlas atlas_gamer2_die_right;
 
 extern Player* player_1;
 extern Player* player_2;
@@ -19,7 +21,7 @@ extern Player* player_2;
 class PlayerGamer2 : public Player
 {
 public:
-	PlayerGamer2()
+	PlayerGamer2(bool facing_right = true) : Player(facing_right)
 	{
 		this->m_animation_idle_left.setAtlas(&atlas_gamer2_idle_left);
 		this->m_animation_idle_right.setAtlas(&atlas_gamer2_idle_right);
@@ -28,6 +30,8 @@ public:
 		this->m_animation_attack_ex_left.setAtlas(&atlas_gamer2_attack_ex_left);
 		this->m_animation_attack_ex_right.setAtlas(&atlas_gamer2_attack_ex_right);
 		this->m_animation_bullet_text.setAtlas(&atlas_gamer2_bullet_text);
+		this->m_animation_die_left.setAtlas(&atlas_gamer2_die_left);
+		this->m_animation_die_right.setAtlas(&atlas_gamer2_die_right);
 
 		this->m_animation_idle_left.setInterval(75);
 		this->m_animation_idle_right.setInterval(75);
@@ -36,6 +40,12 @@ public:
 		this->m_animation_attack_ex_left.setInterval(100);
 		this->m_animation_attack_ex_right.setInterval(100);
 		this->m_animation_bullet_text.setInterval(100);
+
+		this->m_animation_die_left.setInterval(150);
+		this->m_animation_die_right.setInterval(150);
+
+		this->m_animation_die_left.setLoop(false);
+		this->m_animation_die_right.setLoop(false);
 
 		this->m_animation_attack_ex_left.setLoop(false);
 		this->m_animation_attack_ex_right.setLoop(false);
