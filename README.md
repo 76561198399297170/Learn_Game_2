@@ -10499,19 +10499,753 @@ private:
 
 ## 第十五节
 
+### 粒子类编写
+
 分析与解剖粒子系统时，可以从两个角度入手，即粒子对象本身与粒子发射器。
 
 粒子对象通常由动画物理和生命周期等众多属性来描述，而粒子发射器则决定着粒子对象的生成方式，例如发射频率、发射方向和初始速度等等，也就是说一个完整的粒子系统实现是极为庞大的，目前阶段项目仍然是秉持着深入浅出的核心思想，在目前已有知识技术之上封装一个可用的例子系统。
 
-定义particle.h头文件
+定义particle.h头文件并定义Particle类，希望在类内描述粒子属性所以定义了成员变量包含粒子动画播放定时器，持续时长及当前播放动画帧，这里和动画类很像因为目前的粒子对象就是一类特化的动画对象，这与前面的角色与子弹等动画区别在于，粒子发射后在世界坐标位置便固定了，不会随游戏更新而移动，寿命结束即播放结束被释放移除，所以继续为粒子添加世界坐标，是否有效，所用图集的变量属性，所以可以编写一个有参构造直接初始化对应值以及对应set方法便于动态设置属性，对于是否有效不需要进行设置所以只提供check方法。
+
+随后是内部的实现功能，首先是on_update与动画类相差不大，区别在动画推进到图集最后一帧时直接将有效设为否即可，引入对应头文件随后即可添加对应on_draw方法，粒子类即完成了接下来就是将粒子集成到系统中了。
+
+```
+#ifndef _PARTICLE_H_
+#define _PARTICLE_H_
+
+#include "utils.h"
+#include "atlas.h"
+#include "vector2.h"
+#include "camera.h"
+
+class Particle
+{
+public:
+	Particle() = default;
+
+	Particle(const Vector2& position, Atlas* atlas, int lifespan) : m_position(position), m_atlas(atlas), m_lifespan(lifespan) {}
+
+	~Particle() = default;
+
+	void on_update(int delta)
+	{
+		this->m_timer += delta;
+		if (this->m_timer >= this->m_lifespan)
+		{
+			this->m_timer = 0;
+			this->m_idx_frame++;
+			
+			if (this->m_idx_frame >= this->m_atlas->getSize()) 
+			{
+				this->m_idx_frame = this->m_atlas->getSize() - 1;
+				this->is_valid = false;
+			}
+		}
+	}
+
+	void on_draw(const Camera& camera) const 
+	{
+		putImageAlpha(camera, (int)this->m_position.m_x, (int)this->m_position.m_y, this->m_atlas->getImage(this->m_idx_frame));
+	}
+
+	void setAtlas(Atlas* atlas) { this->m_atlas = atlas; }
+
+	void setPosition(const Vector2& position) { this->m_position = position; }
+
+	void setLifespan(int ms) { this->m_lifespan = ms; }
+
+	bool checkValid() const { return this->is_valid; }
+
+private:
+	int m_timer = 0;
+	int m_lifespan = 0;
+	int m_idx_frame = 0;
+
+	bool is_valid = true;
+
+	Vector2 m_position;
+
+	Atlas* m_atlas = nullptr;
+
+};
+
+#endif
+```
+
+
+
+### 移动粒子发射与实现
+
+来到player.h中引入particle.h头文件与所需资源，随后在成员变量部分添加跑动与死亡特效粒子发射定时器，当前项目粒子较为简单单一，只需要模拟角色尾迹生成，所以对于粒子系统另一半的粒子发射器，可以使用定时器来进行替代，对应的还需要定义粒子对象的数组用于存储粒子对象，随后来到构造函数部分对跑步特效的定时器进行初始化只需动态计算玩家脚底生成粒子即可，对于死亡特效定时器也可以编写相似代码（生成速度可以更快，存活时间更长），接下来是粒子生成触发部分在on_update中由于on_run跑动逻辑在其中，所以来到on_run内部添加让跑动特效的时期重新恢复运行的代码，所以在on_update中添加不在跑动时的定时器暂停代码，同时也要在on_update中添加定时器更新调用，利用子弹移除的相同逻辑对无效粒子移除，随后遍历并更新粒子，最后在on_draw中添加粒子绘制，可根据个人需要将粒子布置于玩家前或后。
+
+```
+//引入文件与资源
+#include "particle.h"
+
+extern Atlas atlas_run_effect;
+extern Atlas atlas_jump_effect;
+extern Atlas atlas_land_effect;
+
+//成员变量声明
+Timer m_timer_run_effect_generation;
+Timer m_timer_die_effect_generation;
+
+std::vector<Particle> m_particle_list;
+
+//构造初始化定时器
+this->m_timer_run_effect_generation.setWaitTime(75);
+this->m_timer_run_effect_generation.setCallback([&]()
+	{
+		Vector2 particle_position;
+		IMAGE* frame = atlas_run_effect.getImage(0);
+		particle_position.m_x = this->m_position.m_x + (this->m_size.m_x - frame->getwidth()) / 2;
+		particle_position.m_y = this->m_position.m_y + this->m_size.m_y - frame->getheight();
+
+		m_particle_list.emplace_back(particle_position, &atlas_run_effect, 45);
+	});
+
+this->m_timer_die_effect_generation.setWaitTime(35);
+this->m_timer_die_effect_generation.setCallback([&]()
+	{
+		Vector2 particle_position;
+		IMAGE* frame = atlas_run_effect.getImage(0);
+		particle_position.m_x = this->m_position.m_x + (this->m_size.m_x - frame->getwidth()) / 2;
+		particle_position.m_y = this->m_position.m_y + this->m_size.m_y - frame->getheight();
+
+		m_particle_list.emplace_back(particle_position, &atlas_run_effect, 150);
+	});
+
+
+//on_run重新触发定时器部分
+this->m_timer_run_effect_generation.resume();
+
+//on_update暂停定时器
+this->m_timer_run_effect_generation.pause();
+
+//on_update更新计时器与粒子
+this->m_timer_run_effect_generation.on_updata(delta);
+if (this->m_hp <= 0) this->m_timer_die_effect_generation.on_updata(delta);
+
+this->m_particle_list.erase(std::remove_if(
+this->m_particle_list.begin(), this->m_particle_list.end(),
+	[](const Particle& particle) 
+	{
+		return !particle.checkValid();
+	}), this->m_particle_list.end());
+	for (Particle& p : this->m_particle_list) p.on_update(delta);
+
+if (this->is_show_sketch_frame) sketchImage(this->m_current_animaiton->getFrame(), &this->m_img_sketch);
+
+//on_draw添加粒子绘制
+for (const Particle& p : this->m_particle_list) p.on_draw(camera);
+
+```
+
+
+
+### 跳跃与落地粒子发射与实现
+
+来到接下来继续完成跳跃落地部分的粒子效果编写，继续添加Animation类型玩家跳跃落地动画并定义两个布尔变量标识是否可见跳跃与落地动画以及两个特效的位置变量，因为我们希望特效播放位置位于原地而非跟随玩家移动，并且本可以将所有粒子系统统一起来但因为当前项目架构较小且未做详细文章，所以简单对其功能实现即可，来到构造函数中，对其动画进行初始化。
+
+随后是触发位置，来到on_jump中设置跳跃特效可见性为true并重置动画状态随后计算跳跃动画特效所处坐标，随后来到on_update方法中增加跳跃动画的更新代码，随后在特效可见时对特效进行绘制，仿照on_jump编写on_land逻辑方法，同样在其中先设置特效可见性为true并重置计时器还要计算相对位置，这部分与on_jump中的计算一致，随后同样来到on_update方法进行落地方法动画更新，然后在on_draw中调用落地可见时绘制对应动画。
+
+```
+//添加成员变量
+Animation m_animation_jump_effect;
+Animation m_animation_land_effect;
+
+bool is_jump_effect_visible = false;
+bool is_land_effect_visible = false;
+
+Vector2 m_position_jump_effect;
+Vector2 m_position_land_effect;
+
+//构造初始化方法
+this->m_animation_jump_effect.setAtlas(&atlas_jump_effect);
+this->m_animation_jump_effect.setInterval(25);
+this->m_animation_jump_effect.setLoop(false);
+this->m_animation_jump_effect.setCallBack([&]() { this->is_jump_effect_visible = false; });
+
+this->m_animation_land_effect.setAtlas(&atlas_land_effect);
+this->m_animation_land_effect.setInterval(50);
+this->m_animation_land_effect.setLoop(false);
+this->m_animation_land_effect.setCallBack([&]() { this->is_land_effect_visible = false; });
+
+//on_jump触发跳跃
+this->is_jump_effect_visible = true;
+this->m_animation_jump_effect.reset();
+
+IMAGE* effect_frame = this->m_animation_jump_effect.getFrame();
+this->m_position_jump_effect.m_x = this->m_position.m_x + (this->m_size.m_x - effect_frame->getwidth()) / 2;
+this->m_position_jump_effect.m_y = this->m_position.m_y + this->m_size.m_y - effect_frame->getheight();
+
+//on_update更新
+this->m_animation_jump_effect.on_update(delta);
+
+//on_draw绘制
+if (this->is_jump_effect_visible) this->m_animation_jump_effect.on_draw(camera, (int)this->m_position_jump_effect.m_x, (int)this->m_position_jump_effect.m_y);
+
+//on_land方法编写
+void on_land()
+{
+	this->is_land_effect_visible = true;
+	this->m_animation_land_effect.reset();
+
+	IMAGE* effect_frame = this->m_animation_land_effect.getFrame();
+	this->m_position_land_effect.m_x = this->m_position.m_x + (this->m_size.m_x - effect_frame->getwidth()) / 2;
+	this->m_position_land_effect.m_y = this->m_position.m_y + this->m_size.m_y - effect_frame->getheight();
+}
+
+//on_update方法中更新
+this->m_animation_land_effect.on_update(delta);
+
+//on_draw方法绘制落地可见动画
+if (this->is_land_effect_visible) this->m_animation_land_effect.on_draw(camera, (int)this->m_position_land_effect.m_x, (int)this->m_position_land_effect.m_y);
+
+```
+
+
+
+on_jump方法在前面代码对应位置正确进行调用，但on_land调用位置还不明确，由于落地也属于碰撞一类，碰撞类的代码均放在moveAndCollide中所以也要从这里入手，由于代码中首先根据重力让角色试图下落随后通过场景中平台碰撞外形限制角色坠落趋势，所以欲判断当前角色是否在当前帧落到平台上，只需要判断上一帧速度不为零当前帧为零则说明下落趋势被进行了限制，即玩家落在平台上，所以记录先前速度。
+
+```
+//moveAndCollide方法添加代码
+float last_velocity_y = this->m_velocity.m_y;
+
+//moveAndCollide方法落地前添加代码
+if (last_velocity_y != 0) this->on_land();
+
+```
 
 
 
 ## 第十五节完整代码
 
+**particle.h**
+
+```
+#ifndef _PARTICLE_H_
+#define _PARTICLE_H_
+
+#include "utils.h"
+#include "atlas.h"
+#include "vector2.h"
+#include "camera.h"
+
+class Particle
+{
+public:
+	Particle() = default;
+
+	Particle(const Vector2& position, Atlas* atlas, int lifespan) : m_position(position), m_atlas(atlas), m_lifespan(lifespan) {}
+
+	~Particle() = default;
+
+	void on_update(int delta)
+	{
+		this->m_timer += delta;
+		if (this->m_timer >= this->m_lifespan)
+		{
+			this->m_timer = 0;
+			this->m_idx_frame++;
+			
+			if (this->m_idx_frame >= this->m_atlas->getSize()) 
+			{
+				this->m_idx_frame = this->m_atlas->getSize() - 1;
+				this->is_valid = false;
+			}
+		}
+	}
+
+	void on_draw(const Camera& camera) const 
+	{
+		putImageAlpha(camera, (int)this->m_position.m_x, (int)this->m_position.m_y, this->m_atlas->getImage(this->m_idx_frame));
+	}
+
+	void setAtlas(Atlas* atlas) { this->m_atlas = atlas; }
+
+	void setPosition(const Vector2& position) { this->m_position = position; }
+
+	void setLifespan(int ms) { this->m_lifespan = ms; }
+
+	bool checkValid() const { return this->is_valid; }
+
+private:
+	int m_timer = 0;
+	int m_lifespan = 0;
+	int m_idx_frame = 0;
+
+	bool is_valid = true;
+
+	Vector2 m_position;
+
+	Atlas* m_atlas = nullptr;
+
+};
+
+#endif
+```
+
+**player.h**
+
+```
+#ifndef _PLAYER_H_
+#define _PLAYER_H_
+
+#include "camera.h"
+#include "vector2.h"
+#include "animation.h"
+#include "playerId.h"
+#include "platform.h"
+#include "bullet.h"
+#include "particle.h"
+
+#include <graphics.h>
+
+extern std::vector<Platform> platform_list;
+extern std::vector<Bullet*> bullet_list;
+
+extern Atlas atlas_run_effect;
+extern Atlas atlas_jump_effect;
+extern Atlas atlas_land_effect;
+
+extern bool is_debug;
+
+class Player
+{
+public:
+	Player()
+	{
+		this->m_current_animaiton = &this->m_animation_idle_right;
+
+		this->m_timer_invulnerable.setWaitTime(750);
+		this->m_timer_invulnerable.setOneShot(true);
+		this->m_timer_invulnerable.setCallback([&]() { this->is_invulnerable = false; });
+
+		this->m_timer_invulnerable_blink.setWaitTime(75);
+		this->m_timer_invulnerable_blink.setCallback([&]() {this->is_show_sketch_frame = !this->is_show_sketch_frame; });
+
+		this->m_timer_attack_cd.setWaitTime(this->m_attack_cd);
+		this->m_timer_attack_cd.setOneShot(true);
+		this->m_timer_attack_cd.setCallback([&]() {this->can_attack = true; });
+
+		this->m_timer_run_effect_generation.setWaitTime(75);
+		this->m_timer_run_effect_generation.setCallback([&]()
+			{
+				Vector2 particle_position;
+				IMAGE* frame = atlas_run_effect.getImage(0);
+				particle_position.m_x = this->m_position.m_x + (this->m_size.m_x - frame->getwidth()) / 2;
+				particle_position.m_y = this->m_position.m_y + this->m_size.m_y - frame->getheight();
+
+				m_particle_list.emplace_back(particle_position, &atlas_run_effect, 45);
+			});
+
+		this->m_timer_die_effect_generation.setWaitTime(35);
+		this->m_timer_die_effect_generation.setCallback([&]()
+			{
+				Vector2 particle_position;
+				IMAGE* frame = atlas_run_effect.getImage(0);
+				particle_position.m_x = this->m_position.m_x + (this->m_size.m_x - frame->getwidth()) / 2;
+				particle_position.m_y = this->m_position.m_y + this->m_size.m_y - frame->getheight();
+
+				m_particle_list.emplace_back(particle_position, &atlas_run_effect, 150);
+			});
+
+		this->m_animation_jump_effect.setAtlas(&atlas_jump_effect);
+		this->m_animation_jump_effect.setInterval(25);
+		this->m_animation_jump_effect.setLoop(false);
+		this->m_animation_jump_effect.setCallBack([&]() { this->is_jump_effect_visible = false; });
+
+		this->m_animation_land_effect.setAtlas(&atlas_land_effect);
+		this->m_animation_land_effect.setInterval(50);
+		this->m_animation_land_effect.setLoop(false);
+		this->m_animation_land_effect.setCallBack([&]() { this->is_land_effect_visible = false; });
+	}
+
+	~Player() = default;
+
+	virtual void on_update(int delta)
+	{
+		if (this->is_attack_keydown)
+		{
+			if (this->can_attack)
+			{
+				this->on_attack();
+				this->can_attack = false;
+				this->m_timer_attack_cd.restart();
+			}
+		}
+
+		int direction = this->is_right_keydown - this->is_left_keydown;
+
+		if (direction != 0)
+		{
+			if (!this->is_attacking_ex) this->is_facing_right = direction > 0;
+
+			this->m_current_animaiton = is_facing_right ? &this->m_animation_run_right : &this->m_animation_run_left;
+			
+			float distance = direction * this->run_velocity * delta;
+			this->on_run(distance);
+		}
+		else
+		{
+			this->m_current_animaiton = is_facing_right ? &this->m_animation_idle_right : &this->m_animation_idle_left;
+			this->m_timer_run_effect_generation.pause();
+		}
+
+		if (this->is_attacking_ex) this->m_current_animaiton = this->is_facing_right ? &this->m_animation_attack_ex_right : &this->m_animation_attack_ex_left;
+
+		this->m_current_animaiton->on_update(delta);
+		this->m_animation_jump_effect.on_update(delta);
+		this->m_animation_land_effect.on_update(delta);
+
+		this->m_timer_attack_cd.on_updata(delta);
+		this->m_timer_invulnerable.on_updata(delta);
+		this->m_timer_invulnerable_blink.on_updata(delta);
+		
+		this->m_timer_run_effect_generation.on_updata(delta);
+		if (this->m_hp <= 0) this->m_timer_die_effect_generation.on_updata(delta);
+
+		this->m_particle_list.erase(std::remove_if(
+		this->m_particle_list.begin(), this->m_particle_list.end(),
+			[](const Particle& particle) 
+			{
+				return !particle.checkValid();
+			}), this->m_particle_list.end());
+		for (Particle& p : this->m_particle_list) p.on_update(delta);
+
+		if (this->is_show_sketch_frame) sketchImage(this->m_current_animaiton->getFrame(), &this->m_img_sketch);
+
+		this->moveAndCollide(delta);
+	}
+
+	virtual void on_draw(const Camera& camera)
+	{
+		for (const Particle& p : this->m_particle_list) p.on_draw(camera);
+
+		if (this->is_jump_effect_visible) this->m_animation_jump_effect.on_draw(camera, (int)this->m_position_jump_effect.m_x, (int)this->m_position_jump_effect.m_y);
+		if (this->is_land_effect_visible) this->m_animation_land_effect.on_draw(camera, (int)this->m_position_land_effect.m_x, (int)this->m_position_land_effect.m_y);
+
+		if (this->m_hp > 0 && this->is_invulnerable && this->is_show_sketch_frame) putImageAlpha(camera, (int)this->m_position.m_x, (int)this->m_position.m_y, &this->m_img_sketch);
+		else this->m_current_animaiton->on_draw(camera, this->m_position.m_x, this->m_position.m_y);
+
+		if (is_debug)
+		{
+			setlinecolor(RGB(0, 125, 255));
+			rectangle((int)this->m_position.m_x, (int)this->m_position.m_y, (int)(this->m_position.m_x + this->m_size.m_x), (int)(this->m_position.m_y + this->m_size.m_y));
+		}
+	}
+
+	virtual void on_input(const ExMessage& msg)
+	{
+		switch (msg.message)
+		{
+		case WM_KEYDOWN:
+			switch (this->m_id)
+			{
+			case PlayerId::P1:
+				switch (msg.vkcode)
+				{
+				case 0x41://'A'
+					this->is_left_keydown = true;
+					break;
+				case 0x44://'D'
+					this->is_right_keydown = true;
+					break;
+				case 0x57://'W'
+					this->on_jump();
+					break;
+				case 0x46://'F'
+					this->is_attack_keydown = true;
+					break;
+				case 0x47://'G'
+					if (this->m_mp >= 100) this->m_mp = 0, this->on_attack_ex();
+					break;
+				}
+				break;
+			case PlayerId::P2:
+				switch (msg.vkcode)
+				{
+				case VK_LEFT://'←'
+					this->is_left_keydown = true;
+					break;
+				case VK_RIGHT://'→'
+					this->is_right_keydown = true;
+					break;
+				case VK_UP://'↑'
+					this->on_jump();
+					break;
+				case VK_OEM_PERIOD://'.'
+					this->is_attack_keydown = true;
+					break;
+				case VK_OEM_COMMA://','
+					if (this->m_mp >= 100) this->m_mp = 0, this->on_attack_ex();
+					break;
+				}
+				break;
+			}
+			break;
+		case WM_KEYUP:
+			switch (this->m_id)
+			{
+			case PlayerId::P1:
+				switch (msg.vkcode)
+				{
+				case 0x41://'A'
+					this->is_left_keydown = false;
+					break;
+				case 0x44://'D'
+					this->is_right_keydown = false;
+					break;
+				case 0x46://'F'
+					this->is_attack_keydown = false;
+					break;
+				}
+				break;
+			case PlayerId::P2:
+				switch (msg.vkcode)
+				{
+				case VK_LEFT://'←'
+					this->is_left_keydown = false;
+					break;
+				case VK_RIGHT://'→'
+					this->is_right_keydown = false;
+					break;
+				case VK_OEM_PERIOD://'.'
+					this->is_attack_keydown = false;
+					break;
+				}
+				break;
+			}
+			break;
+		}
+
+	}
+
+	void on_jump()
+	{
+		if (this->m_velocity.m_y != 0 || this->is_attacking_ex) return;
+
+		this->m_velocity.m_y += this->jump_velocity;
+		this->is_jump_effect_visible = true;
+		this->m_animation_jump_effect.reset();
+
+		IMAGE* effect_frame = this->m_animation_jump_effect.getFrame();
+		this->m_position_jump_effect.m_x = this->m_position.m_x + (this->m_size.m_x - effect_frame->getwidth()) / 2;
+		this->m_position_jump_effect.m_y = this->m_position.m_y + this->m_size.m_y - effect_frame->getheight();
+	}
+
+	void on_land()
+	{
+		this->is_land_effect_visible = true;
+		this->m_animation_land_effect.reset();
+
+		IMAGE* effect_frame = this->m_animation_land_effect.getFrame();
+		this->m_position_land_effect.m_x = this->m_position.m_x + (this->m_size.m_x - effect_frame->getwidth()) / 2;
+		this->m_position_land_effect.m_y = this->m_position.m_y + this->m_size.m_y - effect_frame->getheight();
+	}
+
+	void on_run(float destance) 
+	{
+		if (this->is_attacking_ex) return;
+
+		this->m_position.m_x += destance;
+		this->m_timer_run_effect_generation.resume();
+	}
+
+	void moveAndCollide(int delta)
+	{
+		float last_velocity_y = this->m_velocity.m_y;
+
+		this->m_velocity.m_y += this->gravity * delta;
+		this->m_position += this->m_velocity * (float)delta;
+
+		if (this->m_velocity.m_y > 0)
+		{
+			for (const Platform& pt : platform_list)
+			{
+				const Platform::CollisionShape& shape = pt.m_shape;
+
+				bool is_collide_x = (max(this->m_position.m_x + this->m_size.m_x, shape.right) - min(this->m_position.m_x, shape.left) <= this->m_size.m_x + (shape.right - shape.left));
+				bool is_collide_y = (shape.y >= this->m_position.m_y && shape.y <= this->m_position.m_y + this->m_size.m_y);
+
+				if (is_collide_x && is_collide_y)
+				{
+					float delta_pos_y = this->m_velocity.m_y * delta;
+					float last_tick_foot_pos_y = this->m_position.m_y + this->m_size.m_y - delta_pos_y;
+					if (last_tick_foot_pos_y <= shape.y)
+					{
+						this->m_position.m_y = shape.y - this->m_size.m_y;
+						this->m_velocity.m_y = 0;
+
+						if (last_velocity_y != 0) this->on_land();
+
+						break;
+					}
+				}
+			}
+		}
+
+		if (!this->is_invulnerable)
+		{
+			for (Bullet* b : bullet_list)
+			{
+				if (!b->getValid() || b->getCollideTarget() != this->m_id) continue;
+
+				if (b->checkCollide(this->m_position, this->m_size))
+				{
+					this->makeInvulnerable();
+
+					b->on_collide();
+					b->setValid(false);
+
+					this->m_hp -= b->getDamage();
+				}
+			}
+		}
+	}
+
+	void makeInvulnerable()
+	{
+		this->is_invulnerable = true;
+		this->m_timer_invulnerable.restart();
+	}
+
+	void setId(PlayerId id) { this->m_id = id; }
+
+	void setPosition(int x, int y) { this->m_position.m_x = x, this->m_position.m_y = y; }
+
+	const Vector2& getPosition() const { return this->m_position; }
+
+	const Vector2& getSize() const { return this->m_size; }
+
+	const int getHp() const { return this->m_hp; }
+
+	const int getMp() const { return this->m_mp; }
+
+	virtual void on_attack() {}
+
+	virtual void on_attack_ex() {}
+
+protected:
+	int m_hp = 100;
+	int m_mp = 0;
+
+	Vector2 m_size;
+	Vector2 m_position;
+	Vector2 m_velocity;
+
+	Vector2 m_position_jump_effect;
+	Vector2 m_position_land_effect;
+
+	Animation m_animation_idle_left;
+	Animation m_animation_idle_right;
+	Animation m_animation_run_left;
+	Animation m_animation_run_right;
+	Animation m_animation_attack_ex_left;
+	Animation m_animation_attack_ex_right;
+	Animation m_animation_jump_effect;
+	Animation m_animation_land_effect;
+
+	Animation* m_current_animaiton = nullptr;
+
+	PlayerId m_id;
+
+	IMAGE m_img_sketch;
+
+	const float run_velocity = 0.55f;//水平移动速度
+	const float gravity = 0.0016f;//重力加速度
+	const float jump_velocity = -0.85f;//跳跃速度
+
+	bool is_jump_effect_visible = false;
+	bool is_land_effect_visible = false;
+
+	bool is_invulnerable = false;
+	bool is_show_sketch_frame = false;
+
+	bool is_left_keydown = false;
+	bool is_right_keydown = false;
+
+	bool is_facing_right = true;
+
+	bool is_attack_keydown = false;
+	bool is_attacking_ex = false;
+
+	bool can_attack = true;
+	int m_attack_cd = 500;
+
+	Timer m_timer_attack_cd;
+	Timer m_timer_invulnerable;
+	Timer m_timer_invulnerable_blink;
+
+	std::vector<Particle> m_particle_list;
+
+	Timer m_timer_run_effect_generation;
+	Timer m_timer_die_effect_generation;
+
+};
+
+#endif
+```
+
 
 
 ## 第十六节
+
+### 游戏胜负判定功能
+
+游戏结束情况无非两种，其一为角色生命值归零时产生胜负条件，对应的由于提供了重力就会发生跌落平台的情况，也就是其二摔落平台另一方玩家产生获胜判定，若统一使用生命值判定胜负则将摔落世界外，应该将玩家生命值清空。
+
+首先在player.h中增加提供了setHp的方法，用于设置生命值，随后来打GameScene.h中on_update中先分别获取玩家1与玩家2位置并潘丹二者是否落入窗口下方进行Hp设置，随后在角色任意一方角色生命归零时强制弹窗提示并退出结束。
+
+注意之前的游戏音效并未进行切换，来到selectorScene.h中的on_exit方法停止菜单背景音乐，并在gameScene.h中的on_enter方法播放音乐。
+
+在gameScene.h中添加变量标记游戏是否结束，随后在其中的on_update中即可编写判断结束并播放背景音乐的代码，随后在on_update中修改结束方法。
+
+```
+//player.h添加setHp方法
+void setHp(int hp) { this->m_hp = hp; }
+
+//gameScene.h中on_update添加代码
+const Vector2& position_player_1 = player_1->getPosition();
+const Vector2& position_player_2 = player_2->getPosition();
+if (position_player_1.m_y >= getheight()) player_1->setHp(0);
+if (position_player_2.m_y >= getheight()) player_2->setHp(0);
+
+if (player_1->getHp() <= 0 || player_2->getHp() <= 0)
+{
+	MessageBox(GetHWnd(), L"游戏结束", L"测试窗口", MB_OK);
+	exit(0);
+}
+
+//selectorScene.h中on_exit停止音乐
+mciSendString(L"stop bgm_menu", NULL, 0, NULL);
+
+//gameScene.h中on_enter播放音乐
+mciSendString(L"play bgm_game repeat from 0", NULL, 0, NULL);
+
+//gameScene.h中添加变量
+bool is_game_over = false;
+
+//gameScene.h中on_update中修改代码
+if (player_1->getHp() <= 0 || player_2->getHp() <= 0)
+{
+	if (!this->is_game_over)
+	{
+		mciSendString(L"stop bgm_game", NULL, 0, NULL);
+		mciSendString(L"play ui_win from 0", NULL, 0, NULL);
+	}
+
+	this->is_game_over = true;
+}
+
+```
+
+
+
+### 界面结算动画特效
+
+首先
 
 
 
