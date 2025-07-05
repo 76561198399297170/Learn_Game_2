@@ -139,6 +139,7 @@
     <ClInclude Include="gamer2BulletEx.h" />
     <ClInclude Include="gameScene.h" />
     <ClInclude Include="menuScene.h" />
+    <ClInclude Include="particle.h" />
     <ClInclude Include="platform.h" />
     <ClInclude Include="player.h" />
     <ClInclude Include="playerGamer1.h" />

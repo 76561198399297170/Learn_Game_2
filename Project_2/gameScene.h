@@ -82,6 +82,7 @@ public:
 		small_platform_3.m_shape.right = (float)small_platform_3.m_render_position.x + img_platform_small.getwidth() - 40;
 		small_platform_3.m_shape.y = (float)small_platform_3.m_render_position.y + img_platform_small.getheight() / 2;
 
+		mciSendString(L"play bgm_game repeat from 0", NULL, 0, NULL);
 	}
 
 	virtual void on_update(int delta)
@@ -101,6 +102,22 @@ public:
 			bullet_list.end());
 
 		for (Bullet* b : bullet_list) b->on_update(delta);
+
+		const Vector2& position_player_1 = player_1->getPosition();
+		const Vector2& position_player_2 = player_2->getPosition();
+		if (position_player_1.m_y >= getheight()) player_1->setHp(0);
+		if (position_player_2.m_y >= getheight()) player_2->setHp(0);
+
+		if (player_1->getHp() <= 0 || player_2->getHp() <= 0)
+		{
+			if (!this->is_game_over)
+			{
+				mciSendString(L"stop bgm_game", NULL, 0, NULL);
+				mciSendString(L"play ui_win from 0", NULL, 0, NULL);
+			}
+
+			this->is_game_over = true;
+		}
 
 		this->m_status_bar_1P.setHp(player_1->getHp());
 		this->m_status_bar_1P.setMp(player_1->getMp());
@@ -156,6 +173,8 @@ private:
 
 	StatusBar m_status_bar_1P;
 	StatusBar m_status_bar_2P;
+
+	bool is_game_over = false;
 
 };
 
